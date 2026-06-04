@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/main.min.js"></script>
 
   <script type="text/babel">
+const { useState, useRef, useEffect, useMemo } = React;
 const { createClient } = window.supabase;
 const SUPABASE_URL = "https://yjgeakxdhgjhzstvmziq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_9SIlkXrWdAW_ircXhZ_bCg_APPKieBA";
@@ -584,7 +585,7 @@ function Transactions({ state, editEntry, deleteEntry, setBucketForEntry }) {
               {e.type === "Expenses" && (
                 <select value={e.bucket || ""} onChange={(ev)=>setBucketForEntry(e.id, ev.target.value || undefined)} className="ap-txn-bucket-select">
                   <option value="">No bucket</option>
-                  {/* buckets would be injected here */}
+                  {Object.keys(state.buckets || {}).map((b)=>(<option key={b} value={b}>{b}</option>))}
                 </select>
               )}
               <button className="ap-del" onClick={()=>deleteEntry(e.id)}>✕</button>
