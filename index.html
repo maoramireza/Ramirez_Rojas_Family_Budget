@@ -55,7 +55,7 @@ const BASELINE = {
   entries: []
 };
 
-function App() {
+function App({ session, onSignOut }) {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -217,7 +217,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    if (window.onSignOut) window.onSignOut();
+    if (onSignOut) onSignOut();
   };
 
   const stayLoggedIn = () => {
