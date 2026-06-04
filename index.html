@@ -54,7 +54,7 @@ const uid = () => (window.crypto?.randomUUID?.() || String(Date.now()+Math.rando
 function App({ session, onSignOut }) {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("idle");
   const [archives, setArchives] = useState([]);
   const [online, setOnline] = useState([]);
   const now = new Date();
@@ -65,6 +65,7 @@ function App({ session, onSignOut }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const firstSave = useRef(true);
   const lastSavedRef = useRef(null);
+  const stateRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
   const warningShownRef = useRef(false);
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
@@ -86,23 +87,43 @@ function App({ session, onSignOut }) {
     })();
   }, []);
 
-  /* ---- debounced persist to Supabase ---- */
+  /* ---- save (robust, with visible status + flush on hide) ---- */
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  const doSave = async (st) => {
+    if (!st) return;
+    const json = JSON.stringify(st);
+    if (json === lastSavedRef.current) return;
+    setSaveStatus("saving");
+    try {
+      const { error } = await sb.from("budgets").upsert(
+        { id: "family", state: st, updated_at: new Date().toISOString(), updated_by: session?.user?.id },
+        { onConflict: "id" }
+      );
+      if (error) throw error;
+      lastSavedRef.current = json;
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus((s) => s === "saved" ? "idle" : s), 1600);
+    } catch (e) {
+      setSaveStatus("error");
+    }
+  };
+
   useEffect(() => {
     if (!loaded || !state) return;
     if (firstSave.current) { firstSave.current = false; return; }
-    const json = JSON.stringify(state);
-    if (json === lastSavedRef.current) return;
-    const t = setTimeout(async () => {
-      try {
-        const { error } = await sb.from("budgets").upsert(
-          { id: "family", state, updated_at: new Date().toISOString(), updated_by: session?.user?.id },
-          { onConflict: "id" }
-        );
-        if (!error) { lastSavedRef.current = json; setSaved(true); setTimeout(()=>setSaved(false), 1200); }
-      } catch (e) {}
-    }, 600);
+    if (JSON.stringify(state) === lastSavedRef.current) return;
+    const t = setTimeout(() => doSave(state), 600);
     return () => clearTimeout(t);
   }, [state, loaded]);
+
+  useEffect(() => {
+    const flush = () => { const st = stateRef.current; if (st && JSON.stringify(st) !== lastSavedRef.current) doSave(st); };
+    const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", flush);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", flush); };
+  }, []);
 
   /* ---- realtime ---- */
   useEffect(() => {
@@ -230,7 +251,10 @@ function App({ session, onSignOut }) {
                 return others.length>0
                   ? <span className="ap-presence"><i className="pdot on"/>{others.map((e)=>NAMES[e]||e.split("@")[0]).join(", ")} online</span>
                   : <span className="ap-presence"><i className="pdot off"/>Just you</span>; })()}
-              <span className="ap-saved" style={{opacity: saved?1:0}}>✓ saved</span>
+              <span className="ap-saved" style={{opacity: saveStatus==="idle"?0:1, color: saveStatus==="error"?"var(--clay)":saveStatus==="saving"?"var(--ink-soft)":"var(--emerald)", cursor: saveStatus==="error"?"pointer":"default"}}
+                onClick={()=>{ if(saveStatus==="error") doSave(stateRef.current); }}>
+                {saveStatus==="saving" ? "saving…" : saveStatus==="error" ? "⚠ not saved — tap to retry" : "✓ saved"}
+              </span>
             </div>
             <div className="ap-period">
               <button className="ap-arrow" onClick={()=>stepMonth(-1)} aria-label="Previous month">‹</button>
@@ -438,6 +462,27 @@ function MiniPanel({ title, rows, planAmt, spent, accent, verb }) {
   );
 }
 
+function Combo({ value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const filtered = options.filter((o) => o.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="ap-combo">
+      <input type="text" value={open ? q : value} placeholder={placeholder}
+        onFocus={()=>{ setOpen(true); setQ(""); }}
+        onChange={(e)=>{ setQ(e.target.value); setOpen(true); }}
+        onBlur={()=>setTimeout(()=>setOpen(false), 150)}
+        onKeyDown={(e)=>{ if(e.key==="Enter" && filtered[0]){ onChange(filtered[0]); setOpen(false); e.target.blur(); } if(e.key==="Escape"){ setOpen(false); e.target.blur(); } }}/>
+      {open && (
+        <ul className="ap-combo-list">
+          {filtered.map((o)=>(<li key={o} onMouseDown={(e)=>{ e.preventDefault(); onChange(o); setOpen(false); }}>{o}</li>))}
+          {filtered.length===0 && <li className="none">No match</li>}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function AddBar({ state, month_key, addEntry }) {
   const [type, setType] = useState("Expenses");
   const [category, setCategory] = useState(state.categories.Expenses[0] || "");
@@ -454,7 +499,7 @@ function AddBar({ state, month_key, addEntry }) {
 
   const add = () => {
     const amt = parseFloat(amount); if (!amt || amt<=0 || !category) return;
-    addEntry({ id: uid(), date, type, category, amount: Math.round(amt*100)/100, note: note.trim(), bucket: (type==="Expenses"&&bucket)?bucket:undefined });
+    addEntry({ id: uid(), date, type, category, amount: Math.round(amt*100)/100, note: note.trim(), bucket: (type==="Expenses"&&bucket&&bucket!=="No bucket")?bucket:undefined });
     setAmount(""); setNote(""); setBucket("");
   };
   return (
@@ -463,14 +508,9 @@ function AddBar({ state, month_key, addEntry }) {
       <select value={type} onChange={(e)=>setType(e.target.value)}>
         {TYPES.map((t)=>(<option key={t}>{t}</option>))}
       </select>
-      <select className="wide" value={category} onChange={(e)=>setCategory(e.target.value)}>
-        {cats.map((c)=>(<option key={c}>{c}</option>))}
-      </select>
+      <div className="wide"><Combo value={category} onChange={setCategory} options={cats} placeholder="Search category…"/></div>
       {type==="Expenses" && buckets.length>0 && (
-        <select value={bucket} onChange={(e)=>setBucket(e.target.value)}>
-          <option value="">No bucket</option>
-          {buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}
-        </select>
+        <div className="bktwrap"><Combo value={bucket} onChange={(v)=>setBucket(v==="No bucket"?"":v)} options={["No bucket", ...buckets]} placeholder="Bucket…"/></div>
       )}
       <input type="date" value={date} onChange={(e)=>setDate(e.target.value)}/>
       <input className="amt" type="number" placeholder="0.00" value={amount}
@@ -1021,6 +1061,14 @@ function Styles() {
     border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;outline:none;}
   .ap-addbar select:focus,.ap-addbar input:focus{border-color:var(--navy);}
   .ap-addbar .wide{min-width:150px;}.ap-addbar .amt{width:96px;}.ap-addbar .note{flex:1;min-width:120px;}
+  .ap-combo{position:relative;}
+  .ap-combo input{width:100%;font-family:'Archivo';font-size:14px;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;outline:none;}
+  .ap-combo input:focus{border-color:var(--navy);}
+  .ap-combo-list{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;list-style:none;margin:0;padding:4px;background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;box-shadow:0 12px 30px -12px rgba(27,34,48,.35);max-height:240px;overflow-y:auto;}
+  .ap-combo-list li{padding:9px 11px;font-size:14px;border-radius:7px;cursor:pointer;color:var(--ink);}
+  .ap-combo-list li:hover{background:#EDF1F7;}
+  .ap-combo-list li.none{color:var(--ink-soft);cursor:default;}
+  .ap-addbar .bktwrap{min-width:120px;}
   .ap-addbtn{font-family:'Archivo';font-weight:700;font-size:14px;background:var(--ink);color:var(--paper2);
     border:none;border-radius:8px;padding:9px 22px;cursor:pointer;}
   .ap-addbtn:hover{background:var(--emerald);}
