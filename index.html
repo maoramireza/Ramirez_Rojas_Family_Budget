@@ -933,9 +933,9 @@ function Styles() {
     border-radius:7px;padding:6px 11px;cursor:pointer;color:var(--ink-soft);margin-left:2px;}
   .ap-todaybtn:hover{border-color:var(--navy);color:var(--ink);}
 
-  .ap-tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1.5px solid var(--line);}
+  .ap-tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1.5px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .ap-tabs button{font-family:'Archivo';font-weight:600;font-size:14px;background:none;border:none;cursor:pointer;
-    color:var(--ink-soft);padding:10px 16px;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;}
+    color:var(--ink-soft);padding:10px 16px;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;white-space:nowrap;flex-shrink:0;}
   .ap-tabs button.on{color:var(--ink);border-color:var(--navy);}
 
   .ap-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
