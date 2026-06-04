@@ -208,14 +208,27 @@ function App({ session, onSignOut }) {
   /* ---- end year archive ---- */
   const endYear = async () => {
     const yr = year;
-    if (!confirm(`Archive the ${yr} budget and start ${yr+1} fresh? Your ${yr} data is saved and viewable in Trends.`)) return;
+    if (!confirm(`Archive the ${yr} budget and start ${yr+1} fresh?\n\nThis is reversible — you can Restore ${yr} anytime from this same section. Your logged transactions are never deleted.`)) return;
     try {
       await window.saveArchive(yr, state);
       update((s)=>{ TYPES.forEach((type)=>{ s.plan[type]={}; s.categories[type].forEach((c)=>{ s.plan[type][c]={}; }); }); });
       setYear(yr+1); setMonth(1);
       const a = await window.loadArchives(); setArchives(a||[]);
-      alert(`✓ ${yr} archived. You're now budgeting ${yr+1}.`);
+      alert(`✓ ${yr} archived. You're now budgeting ${yr+1}. You can Restore ${yr} anytime.`);
     } catch (e) { alert("Error archiving: " + e.message); }
+  };
+
+  const restoreYear = async (yr) => {
+    const a = archives.find((x)=>x.year===yr);
+    if (!a || !a.state) { alert("No archived data found for " + yr); return; }
+    if (!confirm(`Restore ${yr}? This brings back ${yr}'s budgeted amounts and categories. Your logged transactions are kept as-is.`)) return;
+    update((s)=>{
+      if (a.state.plan) s.plan = structuredClone(a.state.plan);
+      if (a.state.categories) s.categories = structuredClone(a.state.categories);
+      if (a.state.buckets) s.buckets = structuredClone(a.state.buckets);
+    });
+    setYear(yr); setMonth(1);
+    alert(`✓ ${yr} restored. You're now viewing ${yr}.`);
   };
 
   const stepMonth = (d) => { let m=month+d, y=year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} setMonth(m); setYear(y); };
@@ -276,7 +289,7 @@ function App({ session, onSignOut }) {
 
         {tab==="dashboard" && (
           <Dashboard state={state} year={year} month={month} month_key={month_key}
-            addEntry={addEntry} deleteEntry={deleteEntry} endYear={endYear}/>
+            addEntry={addEntry} deleteEntry={deleteEntry}/>
         )}
         {tab==="planning" && (
           <Planning state={state} year={year} month={month} month_key={month_key}
@@ -291,7 +304,7 @@ function App({ session, onSignOut }) {
           <Transactions state={state} editEntry={editEntry} deleteEntry={deleteEntry} importTxns={importTxns} setBucketForEntry={setBucketForEntry}/>
         )}
         {tab==="trends" && (
-          <Trends state={state} archives={archives} currentYear={year}/>
+          <Trends state={state} archives={archives} currentYear={year} endYear={endYear} restoreYear={restoreYear}/>
         )}
 
         <footer className="ap-foot">
@@ -303,7 +316,7 @@ function App({ session, onSignOut }) {
 }
 
 /* ================= DASHBOARD ================= */
-function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYear }) {
+function Dashboard({ state, year, month, month_key, addEntry, deleteEntry }) {
   const [q, setQ] = useState("");
   const buckets = Object.keys(state.buckets || {});
   const planAmt = (type, cat) => state.plan[type]?.[cat]?.[month_key] || 0;
@@ -345,7 +358,6 @@ function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYe
             background: usedPct>100?"var(--clay)":usedPct>85?"var(--navy)":"var(--emerald)"}}/>
         </div>
         {savBudget>0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget-expBudget-savBudget)}</div>}
-        <button className="ap-endyear" onClick={endYear} title="Archive this year and start fresh">End Year {year}</button>
       </div>
 
       <AddBar state={state} month_key={month_key} addEntry={addEntry}/>
@@ -839,6 +851,13 @@ function Year({ state, year, goMonth }) {
   const topCats = Object.entries(catMap).map(([c,v])=>({c,v})).sort((a,b)=>b.v-a.v).slice(0,10);
   const maxCat = topCats[0]?.v || 1;
 
+  const bucketMap = {};
+  state.entries.filter((e)=>e.type==="Expenses" && e.date.slice(0,4)===String(year))
+    .forEach((e)=>{ const b = e.bucket || "Untagged"; bucketMap[b]=(bucketMap[b]||0)+e.amount; });
+  const topBuckets = Object.entries(bucketMap).map(([c,v])=>({c,v})).sort((a,b)=>b.v-a.v);
+  const maxBucket = topBuckets[0]?.v || 1;
+  const hasBucketSpend = topBuckets.some((b)=>b.c!=="Untagged");
+
   const chartData = rows.map((r)=>({ name:r.label, Income:Math.round(r.inc), Expenses:Math.round(r.exp), Net:Math.round(r.net) }));
   const hasData = tot.inc>0 || tot.exp>0;
 
@@ -856,6 +875,7 @@ function Year({ state, year, goMonth }) {
         {hasData ? <YearChart data={chartData}/> : <p className="ap-empty">No transactions logged in {year} yet.</p>}
         <div className="ap-legend"><span><i style={{background:"var(--emerald)"}}/>Income</span>
           <span><i style={{background:"var(--clay)"}}/>Expenses</span><span><i style={{background:"var(--navy)"}}/>Net</span></div>
+        <p className="ap-chartnote">The <b>Net</b> line is income minus expenses each month. Above $0 you came out ahead; below $0 you spent more than came in.</p>
       </div>
 
       <div className="ap-yeargrid">
@@ -897,12 +917,26 @@ function Year({ state, year, goMonth }) {
           ) : <p className="ap-empty">Nothing spent in {year} yet.</p>}
         </div>
       </div>
+
+      <div className="ap-card" style={{marginTop:14}}>
+        <h3 className="ap-mini-t">Top buckets · {year}</h3>
+        {hasBucketSpend ? (
+          <ul className="ap-catbars">
+            {topBuckets.map((t)=>(
+              <li key={t.c}>
+                <div className="row"><span className="nm">{t.c==="Untagged" ? <span className="dim">Untagged</span> : t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
+                <div className="ap-track ap-track-sm"><div className="ap-fill" style={{width:(t.v/maxBucket*100)+"%",background:t.c==="Untagged"?"var(--line)":"var(--navy)"}}/></div>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="ap-empty">No bucketed spending in {year} yet. Tag expenses with a bucket when you log them, and they'll group here.</p>}
+      </div>
     </>
   );
 }
 
 /* ================= TRENDS ================= */
-function Trends({ state, archives, currentYear }) {
+function Trends({ state, archives, currentYear, endYear, restoreYear }) {
   const [selectedCats, setSelectedCats] = useState(["Groceries"]);
   const allYears = useMemo(() => {
     const years = []; const yearMap = {};
@@ -981,8 +1015,25 @@ function Trends({ state, archives, currentYear }) {
           </div>
         </>
       ) : (
-        <div className="ap-card"><p className="ap-empty">Only {currentYear} so far. At year-end, tap <b>End Year</b> on the Dashboard to archive it — then you'll see year-over-year trends here.</p></div>
+        <div className="ap-card"><p className="ap-empty">Only {currentYear} so far. At year-end, use <b>Archive {currentYear}</b> below — then you'll see year-over-year trends here.</p></div>
       )}
+
+      <div className="ap-card ap-manageyears">
+        <h3 className="ap-mini-t">Manage years</h3>
+        <p className="ap-chartnote" style={{margin:"0 0 14px"}}>Archiving snapshots the current year and clears the plan so you can start fresh. It's <b>reversible</b> — your transactions are never deleted, and you can restore any year below.</p>
+        <button className="ap-archivebtn" onClick={endYear}>Archive {currentYear} &amp; start {currentYear+1}</button>
+        {(archives && archives.length>0) && (
+          <div className="ap-archlist">
+            <div className="ap-archlbl">Archived years</div>
+            {archives.slice().sort((a,b)=>b.year-a.year).map((a)=>(
+              <div key={a.year} className="ap-archrow">
+                <span className="yr">{a.year}</span>
+                <button className="ap-restorebtn" onClick={()=>restoreYear(a.year)}>Restore</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -1051,8 +1102,16 @@ function Styles() {
   .ap-track{width:100%;height:8px;background:var(--line);border-radius:5px;overflow:hidden;}
   .ap-track-lg{height:12px;}.ap-track-sm{height:6px;}
   .ap-fill{height:100%;border-radius:5px;transition:width .3s ease;}
-  .ap-endyear{font-family:'Archivo';font-weight:600;font-size:12px;background:none;color:var(--clay);border:1.5px solid var(--line);border-radius:8px;padding:7px 14px;cursor:pointer;margin-top:12px;}
-  .ap-endyear:hover{border-color:var(--clay);background:#FBEEEB;}
+  .ap-manageyears{margin-top:14px;}
+  .ap-archivebtn{font-family:'Archivo';font-weight:600;font-size:13px;background:none;color:var(--clay);border:1.5px solid var(--line);border-radius:9px;padding:9px 16px;cursor:pointer;}
+  .ap-archivebtn:hover{border-color:var(--clay);background:#FBEEEB;}
+  .ap-archlist{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;}
+  .ap-archlbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;margin-bottom:8px;}
+  .ap-archrow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);}
+  .ap-archrow:last-child{border-bottom:none;}
+  .ap-archrow .yr{font-family:'JetBrains Mono';font-weight:600;font-size:14px;}
+  .ap-restorebtn{font-family:'Archivo';font-weight:600;font-size:12px;background:none;border:1.5px solid var(--line);border-radius:7px;padding:6px 14px;cursor:pointer;color:var(--navy);}
+  .ap-restorebtn:hover{border-color:var(--navy);background:#EDF1F7;}
 
   .ap-addbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--paper2);
     border:1.5px solid var(--line);border-radius:13px;padding:11px 13px;margin-bottom:18px;}
@@ -1174,6 +1233,8 @@ function Styles() {
 
   .ap-legend{display:flex;gap:18px;margin-top:8px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap;}
   .ap-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+  .ap-chartnote{font-size:12px;color:var(--ink-soft);margin:10px 0 0;line-height:1.5;}
+  .ap-chartnote b{color:var(--navy);}
   .ap-yeargrid{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;}
   .ap-yeartable{width:100%;border-collapse:collapse;font-size:13.5px;}
   .ap-yeartable th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;padding:7px 9px;border-bottom:1.5px solid var(--line);}
