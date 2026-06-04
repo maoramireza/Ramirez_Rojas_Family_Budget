@@ -24,6 +24,26 @@ const SUPABASE_ANON_KEY = "sb_publishable_9SIlkXrWdAW_ircXhZ_bCg_APPKieBA";
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const ALLOWED = ["maoramirezaragon@gmail.com", "irojascantor@gmail.com"];
 
+/* ---- archive helpers ---- */
+window.loadArchives = async () => {
+  try {
+    const { data, error } = await sb.from("budget_archive").select("year,state").order("year", { ascending: true });
+    if (!error && data) return data;
+  } catch (e) { /* ignore */ }
+  return [];
+};
+
+window.saveArchive = async (year, state) => {
+  try {
+    const { error } = await sb.from("budget_archive").upsert(
+      { year, state, saved_at: new Date().toISOString(), saved_by: (await sb.auth.getSession()).data?.session?.user?.id },
+      { onConflict: "year" }
+    );
+    if (error) throw error;
+    return true;
+  } catch (e) { throw new Error("Failed to archive: " + (e.message || "unknown error")); }
+};
+
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const STORE_KEY = "familybudget:app:v2";
@@ -40,6 +60,7 @@ function App({ supabase, session, onSignOut }) {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [archives, setArchives] = useState([]); // year-end snapshots
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()+1); // 1-12
@@ -57,6 +78,12 @@ function App({ supabase, session, onSignOut }) {
       } catch (e) { /* no row yet */ }
       setState(init || { ...structuredClone(BASELINE), entries: [] });
       setLoaded(true);
+      
+      // Load archives for trends
+      try {
+        const a = await window.loadArchives();
+        setArchives(a || []);
+      } catch (e) { /* ignore */ }
     })();
   }, []);
 
@@ -132,6 +159,33 @@ function App({ supabase, session, onSignOut }) {
 
   const stepMonth = (d) => { let m=month+d, y=year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} setMonth(m); setYear(y); };
 
+  const endYear = async () => {
+    const yr = year;
+    if (!confirm(`Archive the ${yr} budget? This will save your current state and reset the budget for the new year.`)) return;
+    try {
+      if (window.saveArchive) {
+        await window.saveArchive(yr, state);
+        alert(`✓ Year ${yr} archived!`);
+        // Reset budget for next year
+        update((s) => {
+          TYPES.forEach((type) => {
+            s.plan[type] = {};
+            s.categories[type].forEach((c) => { s.plan[type][c] = {}; });
+          });
+        });
+        setYear(yr + 1);
+        setMonth(1);
+        // Reload archives
+        if (window.loadArchives) {
+          const a = await window.loadArchives();
+          setArchives(a);
+        }
+      }
+    } catch (e) {
+      alert("Error archiving: " + e.message);
+    }
+  };
+
   if (!loaded || !state) return <div className="ap-root"><Styles/><p className="ap-loading">Loading…</p></div>;
 
   return (
@@ -158,14 +212,14 @@ function App({ supabase, session, onSignOut }) {
         </header>
 
         <nav className="ap-tabs">
-          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","Year"]].map(([k,l])=>(
+          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","Year"],["trends","📊 Trends"]].map(([k,l])=>(
             <button key={k} className={tab===k?"on":""} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </nav>
 
         {tab==="dashboard" && (
           <Dashboard state={state} year={year} month={month} month_key={month_key}
-            addEntry={addEntry} deleteEntry={deleteEntry}/>
+            addEntry={addEntry} deleteEntry={deleteEntry} endYear={endYear}/>
         )}
         {tab==="planning" && (
           <Planning state={state} year={year} month={month} month_key={month_key}
@@ -178,6 +232,9 @@ function App({ supabase, session, onSignOut }) {
         {tab==="transactions" && (
           <Transactions state={state} editEntry={editEntry} deleteEntry={deleteEntry} importTxns={importTxns}/>
         )}
+        {tab==="trends" && (
+          <Trends state={state} archives={archives} currentYear={year}/>
+        )}
 
         <footer className="ap-foot">
           Plan & transactions auto-save to your shared family budget and sync live across devices · {state.entries.length} records logged.
@@ -188,7 +245,7 @@ function App({ supabase, session, onSignOut }) {
 }
 
 /* ================= DASHBOARD ================= */
-function Dashboard({ state, year, month, month_key, addEntry, deleteEntry }) {
+function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYear }) {
   const planAmt = (type, cat) => state.plan[type]?.[cat]?.[month_key] || 0;
   const monthEntries = state.entries.filter((e)=>e.date.slice(0,7)===month_key);
   const spentBy = (type) => { const o={}; monthEntries.filter((e)=>e.type===type).forEach((e)=>o[e.category]=(o[e.category]||0)+e.amount); return o; };
@@ -228,6 +285,7 @@ function Dashboard({ state, year, month, month_key, addEntry, deleteEntry }) {
             background: usedPct>100?"var(--clay)":usedPct>85?"var(--navy)":"var(--emerald)"}}/>
         </div>
         {savBudget>0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget-expBudget-savBudget)}</div>}
+        <button className="ap-end-year-btn" onClick={endYear} title="Archive this year and start fresh">End Year {year}</button>
       </div>
 
       <AddBar state={state} month_key={month_key} addEntry={addEntry}/>
@@ -657,6 +715,191 @@ function Year({ state, year, goMonth }) {
   );
 }
 
+/* ================= TRENDS ================= */
+function Trends({ state, archives, currentYear }) {
+  const [selectedCats, setSelectedCats] = useState(["Groceries"]);
+  
+  // Combine current year with archives
+  const allYears = useMemo(() => {
+    const years = [];
+    const yearMap = {};
+    
+    // Process archives
+    archives.forEach((a) => {
+      if (a.year && a.state) {
+        yearMap[a.year] = a.state;
+        years.push(a.year);
+      }
+    });
+    
+    // Add current year
+    yearMap[currentYear] = state;
+    years.push(currentYear);
+    
+    return { years: years.sort((a,b)=>a-b), yearMap };
+  }, [archives, state, currentYear]);
+
+  const expenseCategories = state.categories.Expenses || [];
+
+  const trendData = useMemo(() => {
+    const result = {};
+    selectedCats.forEach((cat) => {
+      result[cat] = {};
+      allYears.years.forEach((yr) => {
+        const yearState = allYears.yearMap[yr];
+        if (yearState) {
+          const entries = (yearState.entries || [])
+            .filter((e) => e.type === "Expenses" && e.category === cat && e.date.slice(0, 4) === String(yr));
+          const total = entries.reduce((a, e) => a + e.amount, 0);
+          result[cat][yr] = total;
+        } else {
+          result[cat][yr] = 0;
+        }
+      });
+    });
+    return result;
+  }, [selectedCats, allYears]);
+
+  const colors = ["var(--clay)", "var(--teal)", "var(--navy)", "var(--emerald)"];
+
+  return (
+    <>
+      <section className="ap-trends">
+        <div className="ap-trends-head">
+          <h2 className="ap-trends-title">Spending Trends</h2>
+          <div className="ap-trend-opts">
+            <label>Compare categories:</label>
+            <select multiple value={selectedCats} onChange={(e) => {
+              const opts = Array.from(e.target.selectedOptions, (o) => o.value);
+              setSelectedCats(opts.length > 0 ? opts : ["Groceries"]);
+            }} className="ap-multiselect">
+              {expenseCategories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {allYears.years.length > 1 ? (
+          <>
+            <div className="ap-trend-chart">
+              <svg viewBox={`0 0 ${50 + allYears.years.length * 80} 300`} preserveAspectRatio="xMidYMid meet">
+                {/* Y-axis label */}
+                <text x="20" y="20" fontSize="12" fill="var(--ink-soft)" textAnchor="end">Spending</text>
+                
+                {/* Grid lines and Y-axis */}
+                {[0, 1000, 2000, 3000, 4000, 5000].map((val) => {
+                  const y = 250 - (val / 5000) * 200;
+                  return (
+                    <g key={`grid-${val}`}>
+                      <line x1="40" y1={y} x2={40 + allYears.years.length * 80} y2={y}
+                        stroke="var(--line)" strokeWidth="0.5" opacity="0.5" />
+                      <text x="35" y={y + 4} fontSize="10" fill="var(--ink-soft)" textAnchor="end">
+                        ${Math.round(val / 100)}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Lines for each category */}
+                {selectedCats.map((cat, catIdx) => {
+                  const points = allYears.years.map((yr, i) => {
+                    const val = trendData[cat]?.[yr] || 0;
+                    const x = 50 + i * 80;
+                    const y = 250 - (val / 5000) * 200;
+                    return `${x},${y}`;
+                  }).join(" ");
+                  return (
+                    <g key={`line-${cat}`}>
+                      <polyline points={points} fill="none" stroke={colors[catIdx % colors.length]}
+                        strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                      {allYears.years.map((yr, i) => {
+                        const val = trendData[cat]?.[yr] || 0;
+                        const x = 50 + i * 80;
+                        const y = 250 - (val / 5000) * 200;
+                        return (
+                          <circle key={`dot-${cat}-${yr}`} cx={x} cy={y} r="3"
+                            fill={colors[catIdx % colors.length]} opacity="0.7" />
+                        );
+                      })}
+                    </g>
+                  );
+                })}
+
+                {/* X-axis and year labels */}
+                <line x1="40" y1="250" x2={40 + allYears.years.length * 80} y2="250"
+                  stroke="var(--line)" strokeWidth="1.5" />
+                {allYears.years.map((yr, i) => {
+                  const x = 50 + i * 80;
+                  return (
+                    <g key={`year-${yr}`}>
+                      <line x1={x} y1="250" x2={x} y2="258" stroke="var(--line)" strokeWidth="1" />
+                      <text x={x} y="275" fontSize="12" fill="var(--ink-soft)" textAnchor="middle">{yr}</text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+
+            <div className="ap-trend-legend">
+              {selectedCats.map((cat, idx) => (
+                <span key={cat}>
+                  <i style={{ background: colors[idx % colors.length] }} />{cat}
+                </span>
+              ))}
+            </div>
+
+            <div className="ap-trend-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    {allYears.years.map((yr) => (
+                      <th key={yr} className="r">{yr}</th>
+                    ))}
+                    {allYears.years.length > 1 && <th className="r">Change</th>}
+                    {allYears.years.length > 1 && <th className="r">% Change</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedCats.map((cat) => {
+                    const vals = allYears.years.map((yr) => trendData[cat]?.[yr] || 0);
+                    const lastVal = vals[vals.length - 1];
+                    const prevVal = vals[vals.length - 2] || 0;
+                    const change = lastVal - prevVal;
+                    const pctChange = prevVal > 0 ? ((change / prevVal) * 100) : 0;
+
+                    return (
+                      <tr key={cat}>
+                        <td className="cat-name">{cat}</td>
+                        {vals.map((v, i) => (
+                          <td key={allYears.years[i]} className="r mono">{fmt(v)}</td>
+                        ))}
+                        {allYears.years.length > 1 && (
+                          <td className="r mono" style={{ color: change >= 0 ? "var(--clay)" : "var(--emerald)" }}>
+                            {(change >= 0 ? "+" : "")}{fmt(change)}
+                          </td>
+                        )}
+                        {allYears.years.length > 1 && (
+                          <td className="r mono" style={{ color: pctChange >= 0 ? "var(--clay)" : "var(--emerald)" }}>
+                            {(pctChange >= 0 ? "+" : "")}{pctChange.toFixed(1)}%
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="ap-empty">Archive previous years to see trends. Click "End Year" in the Dashboard to save this year.</p>
+        )}
+      </section>
+    </>
+  );
+}
+
 /* ================= STYLES ================= */
 function Styles() {
   return (<style>{`
@@ -819,6 +1062,30 @@ function Styles() {
   .chip-income{background:#E1EFE6;color:var(--emerald);}.chip-expenses{background:#F4E3DF;color:var(--clay);}.chip-savings{background:#DFEDEC;color:var(--teal);}
 
   .ap-foot{margin-top:26px;text-align:center;font-size:12px;color:var(--ink-soft);font-family:'JetBrains Mono';}
+
+  /* trends */
+  .ap-trends{max-width:100%;}
+  .ap-trends-head{margin-bottom:20px;}
+  .ap-trends-title{font-family:'Fraunces',serif;font-weight:500;font-size:24px;margin:0 0 12px;}
+  .ap-trend-opts{display:flex;align-items:center;gap:10px;}
+  .ap-trend-opts label{font-size:13px;color:var(--ink-soft);font-weight:600;}
+  .ap-multiselect{font-family:'Archivo';font-size:13px;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px 11px;outline:none;min-width:200px;max-height:100px;}
+  .ap-multiselect:focus{border-color:var(--navy);}
+  .ap-trend-chart{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:16px;margin-bottom:16px;overflow-x:auto;}
+  .ap-trend-chart svg{width:100%;height:auto;min-height:320px;}
+  .ap-trend-legend{display:flex;gap:18px;margin-bottom:16px;font-size:12px;color:var(--ink-soft);}
+  .ap-trend-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px;}
+  .ap-trend-table{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:16px;overflow-x:auto;}
+  .ap-trend-table table{width:100%;border-collapse:collapse;font-size:13px;}
+  .ap-trend-table th{text-align:left;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;padding:9px 10px;border-bottom:1.5px solid var(--line);}
+  .ap-trend-table td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  .ap-trend-table .cat-name{font-weight:500;}
+  .ap-trend-table .r{text-align:right;}
+  .ap-trend-table .mono{font-family:'JetBrains Mono';font-variant-numeric:tabular-nums;}
+
+  /* end year button */
+  .ap-end-year-btn{font-family:'Archivo';font-weight:600;font-size:12px;background:var(--clay);color:var(--paper2);border:none;border-radius:8px;padding:10px 16px;cursor:pointer;margin-top:12px;}
+  .ap-end-year-btn:hover{background:var(--navy);}
 
   /* year view */
   .ap-legend{display:flex;gap:18px;margin-top:8px;font-size:12px;color:var(--ink-soft);}
