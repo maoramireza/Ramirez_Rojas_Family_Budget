@@ -23,6 +23,7 @@ const SUPABASE_URL = "https://yjgeakxdhgjhzstvmziq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_9SIlkXrWdAW_ircXhZ_bCg_APPKieBA";
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const ALLOWED = ["maoramirezaragon@gmail.com", "irojascantor@gmail.com"];
+const NAMES = { "maoramirezaragon@gmail.com": "Mao", "irojascantor@gmail.com": "Ingrid" };
 
 window.loadArchives = async () => {
   try {
@@ -55,6 +56,7 @@ function App({ session, onSignOut }) {
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [archives, setArchives] = useState([]);
+  const [online, setOnline] = useState([]);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()+1);
@@ -62,6 +64,7 @@ function App({ session, onSignOut }) {
   const [showLogoutWarning, setShowLogoutWarning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const firstSave = useRef(true);
+  const lastSavedRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
   const warningShownRef = useRef(false);
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
@@ -75,7 +78,9 @@ function App({ session, onSignOut }) {
         const { data, error } = await sb.from("budgets").select("state").eq("id", "family").maybeSingle();
         if (!error && data && data.state) init = data.state;
       } catch (e) {}
-      setState(init || { ...structuredClone(BASELINE), entries: [] });
+      const initial = init || { ...structuredClone(BASELINE), entries: [] };
+      lastSavedRef.current = JSON.stringify(initial);
+      setState(initial);
       setLoaded(true);
       try { const a = await window.loadArchives(); setArchives(a || []); } catch (e) {}
     })();
@@ -85,13 +90,15 @@ function App({ session, onSignOut }) {
   useEffect(() => {
     if (!loaded || !state) return;
     if (firstSave.current) { firstSave.current = false; return; }
+    const json = JSON.stringify(state);
+    if (json === lastSavedRef.current) return;
     const t = setTimeout(async () => {
       try {
         const { error } = await sb.from("budgets").upsert(
           { id: "family", state, updated_at: new Date().toISOString(), updated_by: session?.user?.id },
           { onConflict: "id" }
         );
-        if (!error) { setSaved(true); setTimeout(()=>setSaved(false), 1200); }
+        if (!error) { lastSavedRef.current = json; setSaved(true); setTimeout(()=>setSaved(false), 1200); }
       } catch (e) {}
     }, 600);
     return () => clearTimeout(t);
@@ -102,8 +109,18 @@ function App({ session, onSignOut }) {
     if (!loaded) return;
     const ch = sb.channel("budgets-changes")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budgets", filter: "id=eq.family" },
-        (payload) => { if (payload.new?.state) setState(payload.new.state); })
+        (payload) => { if (payload.new?.state) { lastSavedRef.current = JSON.stringify(payload.new.state); setState(payload.new.state); } })
       .subscribe();
+    return () => { sb.removeChannel(ch); };
+  }, [loaded]);
+
+  /* ---- live presence (who's here) ---- */
+  useEffect(() => {
+    if (!loaded) return;
+    const myEmail = (session?.user?.email || "").toLowerCase();
+    const ch = sb.channel("family-presence", { config: { presence: { key: myEmail } } });
+    ch.on("presence", { event: "sync" }, () => { setOnline(Object.keys(ch.presenceState())); });
+    ch.subscribe(async (status) => { if (status === "SUBSCRIBED") await ch.track({ email: myEmail, at: new Date().toISOString() }); });
     return () => { sb.removeChannel(ch); };
   }, [loaded]);
 
@@ -208,7 +225,13 @@ function App({ session, onSignOut }) {
             <h1 className="ap-title">Ramirez Rojas<span className="ap-heart">♥</span><span className="ap-bill">💵</span></h1>
           </div>
           <div className="ap-periodbox">
-            {saved && <span className="ap-saved">✓ saved</span>}
+            <div className="ap-statusline">
+              {(() => { const me=(session?.user?.email||"").toLowerCase(); const others=online.filter((e)=>e!==me);
+                return others.length>0
+                  ? <span className="ap-presence"><i className="pdot on"/>{others.map((e)=>NAMES[e]||e.split("@")[0]).join(", ")} online</span>
+                  : <span className="ap-presence"><i className="pdot off"/>Just you</span>; })()}
+              <span className="ap-saved" style={{opacity: saved?1:0}}>✓ saved</span>
+            </div>
             <div className="ap-period">
               <button className="ap-arrow" onClick={()=>stepMonth(-1)} aria-label="Previous month">‹</button>
               <select value={month} onChange={(e)=>setMonth(+e.target.value)}>
@@ -257,6 +280,8 @@ function App({ session, onSignOut }) {
 
 /* ================= DASHBOARD ================= */
 function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYear }) {
+  const [q, setQ] = useState("");
+  const buckets = Object.keys(state.buckets || {});
   const planAmt = (type, cat) => state.plan[type]?.[cat]?.[month_key] || 0;
   const monthEntries = state.entries.filter((e)=>e.date.slice(0,7)===month_key);
   const spentBy = (type) => { const o={}; monthEntries.filter((e)=>e.type===type).forEach((e)=>o[e.category]=(o[e.category]||0)+e.amount); return o; };
@@ -301,14 +326,20 @@ function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYe
 
       <AddBar state={state} month_key={month_key} addEntry={addEntry}/>
 
+      <div className="ap-envsearch">
+        <input type="text" placeholder="Search expense categories…" value={q} onChange={(e)=>setQ(e.target.value)}/>
+        {q && <button onClick={()=>setQ("")}>×</button>}
+      </div>
+
       <section className="ap-env-grid">
-        {envelopes.map((e)=>(
+        {envelopes.filter((e)=> !q || e.c.toLowerCase().includes(q.toLowerCase())).map((e)=>(
           <Envelope key={e.c} env={e}
             items={monthEntries.filter((x)=>x.type==="Expenses"&&x.category===e.c)}
             month_key={month_key} addEntry={addEntry}
-            onDelete={deleteEntry}/>
+            onDelete={deleteEntry} buckets={buckets}/>
         ))}
         {envelopes.length===0 && <p className="ap-loading">No expense budget or spending for {MLABEL[month-1]} {year}. Set one in Planning.</p>}
+        {envelopes.length>0 && envelopes.filter((e)=> !q || e.c.toLowerCase().includes(q.toLowerCase())).length===0 && <p className="ap-loading">No expense category matches "{q}".</p>}
       </section>
 
       <MiniPanel title="Savings" rows={state.categories.Savings} planAmt={(c)=>planAmt("Savings",c)} spent={spentBy("Savings")} accent="teal" verb="saved"/>
@@ -326,11 +357,12 @@ function Stat({ label, val, color, hero }) {
   );
 }
 
-function Envelope({ env, items, month_key, addEntry, onDelete }) {
+function Envelope({ env, items, month_key, addEntry, onDelete, buckets }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [amt, setAmt] = useState("");
   const [note, setNote] = useState("");
+  const [bucket, setBucket] = useState("");
   const pct = env.budget>0 ? (env.spent/env.budget)*100 : (env.spent>0?120:0);
   const over = env.budget>0 && env.spent>env.budget;
   const color = over ? "var(--clay)" : pct>85 ? "var(--navy)" : "var(--emerald)";
@@ -338,8 +370,8 @@ function Envelope({ env, items, month_key, addEntry, onDelete }) {
   const defDate = todayISO.slice(0,7)===month_key ? todayISO : month_key + "-01";
   const submit = () => {
     const a = parseFloat(amt); if (!a || a<=0) return;
-    addEntry({ id: uid(), date: defDate, type:"Expenses", category: env.c, amount: Math.round(a*100)/100, note: note.trim() });
-    setAmt(""); setNote(""); setAdding(false);
+    addEntry({ id: uid(), date: defDate, type:"Expenses", category: env.c, amount: Math.round(a*100)/100, note: note.trim(), bucket: bucket||undefined });
+    setAmt(""); setNote(""); setBucket(""); setAdding(false);
   };
   return (
     <div className={"ap-env"+(over?" over":"")}>
@@ -362,6 +394,12 @@ function Envelope({ env, items, month_key, addEntry, onDelete }) {
             onChange={(e)=>setAmt(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
           <input className="note" type="text" placeholder="note (optional)" value={note}
             onChange={(e)=>setNote(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          {buckets && buckets.length>0 && (
+            <select className="bkt" value={bucket} onChange={(e)=>setBucket(e.target.value)}>
+              <option value="">No bucket</option>
+              {buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}
+            </select>
+          )}
           <button className="ap-envgo" onClick={submit}>Log</button>
         </div>
       )}
@@ -369,7 +407,7 @@ function Envelope({ env, items, month_key, addEntry, onDelete }) {
         <ul className="ap-env-items">
           {items.map((x)=>(
             <li key={x.id}><span className="d">{x.date.slice(8)}</span>
-              <span className="n">{x.note||x.name||"—"}</span>
+              <span className="n">{x.note||x.name||"—"}{x.bucket && <em className="ap-cnt" style={{marginLeft:6}}>{x.bucket}</em>}</span>
               <span className="a mono">{fmt2(x.amount)}</span>
               <button className="x" onClick={()=>onDelete(x.id)} title="Delete">×</button></li>
           ))}
@@ -408,14 +446,16 @@ function AddBar({ state, month_key, addEntry }) {
   const [date, setDate] = useState(dflt());
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [bucket, setBucket] = useState("");
   useEffect(()=>{ setDate(dflt()); }, [month_key]);
   const cats = state.categories[type] || [];
+  const buckets = Object.keys(state.buckets || {});
   useEffect(()=>{ if (!cats.includes(category)) setCategory(cats[0]||""); }, [type]);
 
   const add = () => {
     const amt = parseFloat(amount); if (!amt || amt<=0 || !category) return;
-    addEntry({ id: uid(), date, type, category, amount: Math.round(amt*100)/100, note: note.trim() });
-    setAmount(""); setNote("");
+    addEntry({ id: uid(), date, type, category, amount: Math.round(amt*100)/100, note: note.trim(), bucket: (type==="Expenses"&&bucket)?bucket:undefined });
+    setAmount(""); setNote(""); setBucket("");
   };
   return (
     <div className="ap-addbar">
@@ -426,6 +466,12 @@ function AddBar({ state, month_key, addEntry }) {
       <select className="wide" value={category} onChange={(e)=>setCategory(e.target.value)}>
         {cats.map((c)=>(<option key={c}>{c}</option>))}
       </select>
+      {type==="Expenses" && buckets.length>0 && (
+        <select value={bucket} onChange={(e)=>setBucket(e.target.value)}>
+          <option value="">No bucket</option>
+          {buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}
+        </select>
+      )}
       <input type="date" value={date} onChange={(e)=>setDate(e.target.value)}/>
       <input className="amt" type="number" placeholder="0.00" value={amount}
         onChange={(e)=>setAmount(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&add()}/>
@@ -550,7 +596,9 @@ function PlanSection({ type, cats, planAmt, total, setPlanAmt, addCat, removeCat
 function PlanRow({ name, amount, onAmount, onRename, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
+  const [amtFocus, setAmtFocus] = useState(false);
   useEffect(()=>setDraft(name),[name]);
+  const shownAmt = amtFocus ? (amount||"") : (amount ? amount.toLocaleString("en-US") : "");
   return (
     <div className="ap-planrow">
       {editing ? (
@@ -563,8 +611,9 @@ function PlanRow({ name, amount, onAmount, onRename, onRemove }) {
       )}
       <div className="ap-amtwrap">
         <span className="cur">$</span>
-        <input type="number" min="0" step="1" value={amount||""} placeholder="0"
-          onChange={(e)=>onAmount(parseFloat(e.target.value)||0)}/>
+        <input type="text" inputMode="numeric" value={shownAmt} placeholder="0"
+          onFocus={()=>setAmtFocus(true)} onBlur={()=>setAmtFocus(false)}
+          onChange={(e)=>onAmount(parseFloat(e.target.value.replace(/[^0-9.]/g,""))||0)}/>
       </div>
       <button className="ap-del" onClick={onRemove} title="Remove category">×</button>
     </div>
@@ -669,10 +718,7 @@ function Transactions({ state, editEntry, deleteEntry, importTxns, setBucketForE
                 <td><span className={"chip chip-"+x.type.toLowerCase()}>{x.type}</span></td>
                 <td className="cat">{x.category}</td>
                 <td className="det">{x.note||x.name||<span className="dim">—</span>}</td>
-                <td>{x.bucket ? <span className="bchip">{x.bucket}</span> : (x.type==="Expenses" && buckets.length>0 ?
-                  <select className="bsel" value="" onChange={(e)=>setBucketForEntry(x.id, e.target.value||undefined)}>
-                    <option value="">+ tag</option>{buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}
-                  </select> : <span className="dim">—</span>)}</td>
+                <td>{x.bucket ? <span className="bchip">{x.bucket}</span> : <span className="dim">—</span>}</td>
                 <td className="r mono" style={{color:x.type==="Income"?"var(--emerald)":x.type==="Savings"?"var(--teal)":"var(--ink)"}}>
                   {x.type==="Income"?"+":"−"}{fmt2(x.amount)}</td>
                 <td className="rowacts">
@@ -926,7 +972,17 @@ function Styles() {
   .ap-title .ap-heart{color:var(--navy);font-size:.5em;vertical-align:.35em;margin:0 .12em;}
   .ap-title .ap-bill{font-size:.62em;vertical-align:.12em;}
   .ap-periodbox{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
-  .ap-saved{font-size:11px;color:var(--emerald);font-family:'JetBrains Mono';font-weight:600;}
+  .ap-statusline{display:flex;align-items:center;gap:12px;height:16px;}
+  .ap-presence{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft);font-family:'JetBrains Mono';}
+  .pdot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .pdot.on{background:var(--emerald);box-shadow:0 0 0 3px rgba(28,107,75,.15);}
+  .pdot.off{background:var(--line);}
+  .ap-saved{font-size:11px;color:var(--emerald);font-family:'JetBrains Mono';font-weight:600;transition:opacity .25s ease;}
+  .ap-envsearch{display:flex;align-items:center;gap:6px;margin-bottom:14px;}
+  .ap-envsearch input{flex:1;font-family:'Archivo';font-size:14px;color:var(--ink);background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:9px 13px;outline:none;}
+  .ap-envsearch input:focus{border-color:var(--navy);}
+  .ap-envsearch button{background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;width:38px;height:38px;font-size:18px;color:var(--ink-soft);cursor:pointer;}
+  .ap-envform .bkt{font-family:'Archivo';font-size:12px;border:1.5px solid var(--line);border-radius:7px;padding:6px 6px;background:var(--paper);outline:none;}
   .ap-period{display:flex;align-items:center;gap:6px;background:var(--paper2);border:1.5px solid var(--line);border-radius:11px;padding:4px;}
   .ap-period select,.ap-year{font-family:'Archivo';font-weight:600;font-size:14px;color:var(--ink);background:transparent;border:none;outline:none;padding:6px 8px;border-radius:7px;}
   .ap-year{width:74px;text-align:center;}
