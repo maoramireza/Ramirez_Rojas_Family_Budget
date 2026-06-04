@@ -1,60 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ramirez Rojas Family Budget</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ramirez Rojas · Family Budget</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>html,body{margin:0;padding:0;}#root{min-height:100vh;}</style>
 </head>
 <body>
-  <div id="root"></div>
-  
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
 
-  <script type="text/babel">
-const { useState, useRef, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
+const Papa = window.Papa;
 const { createClient } = window.supabase;
+
 const SUPABASE_URL = "https://yjgeakxdhgjhzstvmziq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_9SIlkXrWdAW_ircXhZ_bCg_APPKieBA";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const ALLOWED = ["maoramirezaragon@gmail.com", "irojascantor@gmail.com"];
 
-/* ---- archive helpers ---- */
 window.loadArchives = async () => {
   try {
-    const { data, error } = await supabase.from("budget_archive").select("year,state").order("year", { ascending: true });
+    const { data, error } = await sb.from("budget_archive").select("year,state").order("year", { ascending: true });
     if (!error && data) return data;
-  } catch (e) { }
+  } catch (e) {}
   return [];
 };
-
 window.saveArchive = async (year, state) => {
-  try {
-    const session = (await supabase.auth.getSession()).data?.session;
-    const { error } = await supabase.from("budget_archive").upsert(
-      { year, state, saved_at: new Date().toISOString(), saved_by: session?.user?.id },
-      { onConflict: "year" }
-    );
-    if (error) throw error;
-    return true;
-  } catch (e) { throw new Error("Failed to archive: " + (e.message || "unknown")); }
+  const session = (await sb.auth.getSession()).data?.session;
+  const { error } = await sb.from("budget_archive").upsert(
+    { year, state, saved_at: new Date().toISOString(), saved_by: session?.user?.id },
+    { onConflict: "year" }
+  );
+  if (error) throw error;
+  return true;
 };
 
+const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const fmt = (n) => new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", minimumFractionDigits:0}).format(n);
-const mk = (y,m) => `${y}-${String(m).padStart(2,"0")}`;
-
-// BASELINE - injected during build
-const BASELINE = {
-  categories: {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]},
-  buckets: {"Subscriptions": {name:"Subscriptions"}, "Utilities": {name:"Utilities"}, "Transportation": {name:"Transportation"}, "Entertainment": {name:"Entertainment"}},
-  plan: {},
-  entries: []
-};
+const pad = (n) => String(n).padStart(2, "0");
+const mk = (y, m) => `${y}-${pad(m)}`;
+const fmt = (n) => (n<0?"-":"") + "$" + Math.abs(Math.round(n)).toLocaleString("en-US");
+const fmt2 = (n) => (n<0?"-":"") + "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const uid = () => (window.crypto?.randomUUID?.() || String(Date.now()+Math.random()));
 
 function App({ session, onSignOut }) {
   const [state, setState] = useState(null);
@@ -72,234 +66,121 @@ function App({ session, onSignOut }) {
   const warningShownRef = useRef(false);
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
   const WARNING_TIME = 2 * 60 * 1000;
-  const month_key = mk(year, month);
 
-  // Core update function
-  const update = (fn) => setState((s) => { const t = structuredClone(s); fn(t); return t; });
-  
-  // Bucket management
-  const addBucket = (name) => {
-    update((s) => {
-      if (!s.buckets) s.buckets = {};
-      if (s.buckets[name]) return;
-      s.buckets[name] = { name };
-    });
-  };
-
-  const renameBucket = (oldName, newName) => {
-    update((s) => {
-      if (!s.buckets || !s.buckets[oldName] || newName === oldName) return;
-      s.buckets[newName] = { name: newName };
-      delete s.buckets[oldName];
-      s.entries.forEach((e) => { if (e.bucket === oldName) e.bucket = newName; });
-    });
-  };
-
-  const deleteBucket = (name) => {
-    update((s) => {
-      if (!s.buckets || !s.buckets[name]) return;
-      delete s.buckets[name];
-      s.entries.forEach((e) => { if (e.bucket === name) e.bucket = undefined; });
-    });
-  };
-
-  // Entry management
-  const addEntry = (type, date, cat, amount, name) => {
-    update((s) => {
-      if (!s.entries) s.entries = [];
-      s.entries.push({ id: Date.now().toString(), type, date, category: cat, amount, name, bucket: undefined });
-    });
-  };
-
-  const deleteEntry = (id) => {
-    update((s) => { s.entries = s.entries.filter((e) => e.id !== id); });
-  };
-
-  const editEntry = (id, field, value) => {
-    update((s) => {
-      const e = s.entries.find((x) => x.id === id);
-      if (e) e[field] = value;
-    });
-  };
-
-  const setBucketForEntry = (id, bucketName) => {
-    update((s) => {
-      const e = s.entries.find((x) => x.id === id);
-      if (e) e.bucket = bucketName || undefined;
-    });
-  };
-
-  // Plan management
-  const setPlanAmt = (type, cat, month_key, amt) => {
-    update((s) => {
-      if (!s.plan[type]) s.plan[type] = {};
-      if (!s.plan[type][cat]) s.plan[type][cat] = {};
-      if (amt === 0 || !amt) delete s.plan[type][cat][month_key];
-      else s.plan[type][cat][month_key] = amt;
-    });
-  };
-
-  const addCat = (type, name) => {
-    update((s) => {
-      if (!s.categories[type].includes(name)) s.categories[type].push(name);
-    });
-  };
-
-  const removeCat = (type, cat) => {
-    update((s) => {
-      s.categories[type] = s.categories[type].filter((c) => c !== cat);
-      delete s.plan[type][cat];
-    });
-  };
-
-  const renameCat = (type, oldName, newName) => {
-    update((s) => {
-      const idx = s.categories[type].indexOf(oldName);
-      if (idx >= 0) s.categories[type][idx] = newName;
-      if (s.plan[type][oldName]) {
-        s.plan[type][newName] = s.plan[type][oldName];
-        delete s.plan[type][oldName];
-      }
-      s.entries.forEach((e) => { if (e.category === oldName) e.category = newName; });
-    });
-  };
-
-  const copyFrom = (source_month_key) => {
-    update((s) => {
-      TYPES.forEach((type) => {
-        s.categories[type].forEach((cat) => {
-          const src = s.plan[type]?.[cat]?.[source_month_key];
-          if (src) s.plan[type][cat][month_key] = src;
-        });
-      });
-    });
-  };
-
-  const resetPlan = () => {
-    update((s) => {
-      TYPES.forEach((type) => {
-        s.plan[type] = {};
-        s.categories[type].forEach((c) => { s.plan[type][c] = {}; });
-      });
-    });
-  };
-
-  // Year archive
-  const endYear = async () => {
-    const yr = year;
-    if (!confirm(`Archive the ${yr} budget?`)) return;
-    try {
-      if (window.saveArchive) {
-        await window.saveArchive(yr, state);
-        alert(`✓ Year ${yr} archived!`);
-        update((s) => {
-          TYPES.forEach((type) => {
-            s.plan[type] = {};
-            s.categories[type].forEach((c) => { s.plan[type][c] = {}; });
-          });
-        });
-        setYear(yr + 1);
-        setMonth(1);
-        if (window.loadArchives) {
-          const a = await window.loadArchives();
-          setArchives(a || []);
-        }
-      }
-    } catch (e) {
-      alert("Error archiving: " + e.message);
-    }
-  };
-
-  // Activity tracking
-  const resetActivity = () => {
-    lastActivityRef.current = Date.now();
-    warningShownRef.current = false;
-    setShowLogoutWarning(false);
-  };
-
-  const handleLogout = () => {
-    if (onSignOut) onSignOut();
-  };
-
-  const stayLoggedIn = () => {
-    resetActivity();
-  };
-
-  // Load and realtime effects
+  /* ---- load from Supabase ---- */
   useEffect(() => {
     (async () => {
       let init = null;
       try {
-        const { data, error } = await supabase.from("budgets").select("state").eq("id", "family").maybeSingle();
+        const { data, error } = await sb.from("budgets").select("state").eq("id", "family").maybeSingle();
         if (!error && data && data.state) init = data.state;
-      } catch (e) { /* no row */ }
+      } catch (e) {}
       setState(init || { ...structuredClone(BASELINE), entries: [] });
       setLoaded(true);
-
-      try {
-        const a = await window.loadArchives();
-        setArchives(a || []);
-      } catch (e) { /* ignore */ }
+      try { const a = await window.loadArchives(); setArchives(a || []); } catch (e) {}
     })();
   }, []);
 
-  // Save effect
+  /* ---- debounced persist to Supabase ---- */
   useEffect(() => {
-    if (!state || !loaded) return;
+    if (!loaded || !state) return;
+    if (firstSave.current) { firstSave.current = false; return; }
     const t = setTimeout(async () => {
       try {
-        const { error } = await supabase.from("budgets").upsert(
-          { id: "family", state, updated_at: new Date().toISOString(), updated_by: (await supabase.auth.getSession()).data?.session?.user?.id },
+        const { error } = await sb.from("budgets").upsert(
+          { id: "family", state, updated_at: new Date().toISOString(), updated_by: session?.user?.id },
           { onConflict: "id" }
         );
-        if (!error) setSaved(true);
-      } catch (e) { /* ignore */ }
+        if (!error) { setSaved(true); setTimeout(()=>setSaved(false), 1200); }
+      } catch (e) {}
     }, 600);
     return () => clearTimeout(t);
   }, [state, loaded]);
 
-  // Realtime subscription
+  /* ---- realtime ---- */
   useEffect(() => {
     if (!loaded) return;
-    const sub = supabase
-      .channel("budgets-changes")
+    const ch = sb.channel("budgets-changes")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budgets", filter: "id=eq.family" },
-        (payload) => {
-          if (firstSave.current) { firstSave.current = false; return; }
-          if (payload.new?.state) setState(payload.new.state);
-        }
-      )
+        (payload) => { if (payload.new?.state) setState(payload.new.state); })
       .subscribe();
-    return () => { supabase.removeChannel(sub); };
+    return () => { sb.removeChannel(ch); };
   }, [loaded]);
 
-  // Inactivity timeout
+  /* ---- inactivity timeout ---- */
+  const resetActivity = () => { lastActivityRef.current = Date.now(); warningShownRef.current = false; setShowLogoutWarning(false); };
+  const handleLogout = () => { if (onSignOut) onSignOut(); };
   useEffect(() => {
-    if (!loaded || !window.supabase) return;
+    if (!loaded) return;
     const handleActivity = () => resetActivity();
     const events = ["mousedown", "keydown", "scroll", "touchstart"];
     events.forEach((e) => document.addEventListener(e, handleActivity));
     const interval = setInterval(() => {
-      const now = Date.now();
-      const elapsed = now - lastActivityRef.current;
+      const elapsed = Date.now() - lastActivityRef.current;
       const remaining = INACTIVITY_TIMEOUT - elapsed;
-      if (remaining <= 0) {
-        clearInterval(interval);
-        events.forEach((e) => document.removeEventListener(e, handleActivity));
-        handleLogout();
-      } else if (remaining <= WARNING_TIME && !warningShownRef.current) {
-        warningShownRef.current = true;
-        setShowLogoutWarning(true);
-        setSecondsLeft(Math.ceil(remaining / 1000));
-      } else if (remaining <= WARNING_TIME) {
-        setSecondsLeft(Math.ceil(remaining / 1000));
-      }
+      if (remaining <= 0) { clearInterval(interval); events.forEach((e)=>document.removeEventListener(e, handleActivity)); handleLogout(); }
+      else if (remaining <= WARNING_TIME) { if (!warningShownRef.current) { warningShownRef.current = true; setShowLogoutWarning(true); } setSecondsLeft(Math.ceil(remaining/1000)); }
     }, 1000);
-    return () => {
-      clearInterval(interval);
-      events.forEach((e) => document.removeEventListener(e, handleActivity));
-    };
+    return () => { clearInterval(interval); events.forEach((e)=>document.removeEventListener(e, handleActivity)); };
   }, [loaded]);
+
+  const month_key = mk(year, month);
+  const update = (fn) => setState((prev) => { const next = structuredClone(prev); fn(next); return next; });
+
+  const setPlanAmt = (type, cat, key, amt) => update((s) => {
+    s.plan[type] = s.plan[type] || {}; s.plan[type][cat] = s.plan[type][cat] || {};
+    if (amt && amt > 0) s.plan[type][cat][key] = amt; else delete s.plan[type][cat][key];
+  });
+  const addCat = (type, name) => update((s) => {
+    name = (name||"").trim(); if (!name || s.categories[type].includes(name)) return;
+    s.categories[type].push(name); s.plan[type] = s.plan[type]||{}; s.plan[type][name] = {};
+  });
+  const removeCat = (type, cat) => update((s) => {
+    s.categories[type] = s.categories[type].filter((c)=>c!==cat);
+    if (s.plan[type]) delete s.plan[type][cat];
+  });
+  const renameCat = (type, oldN, newN) => update((s) => {
+    newN = (newN||"").trim(); if (!newN || oldN===newN || s.categories[type].includes(newN)) return;
+    s.categories[type] = s.categories[type].map((c)=>c===oldN?newN:c);
+    if (s.plan[type]?.[oldN]) { s.plan[type][newN] = {...s.plan[type][oldN]}; delete s.plan[type][oldN]; }
+    s.entries = s.entries.map((e)=> e.type===type&&e.category===oldN ? {...e, category:newN} : e);
+  });
+  const copyFrom = (srcKey) => update((s) => {
+    TYPES.forEach((type)=> s.categories[type].forEach((c)=>{
+      const v = s.plan[type]?.[c]?.[srcKey];
+      s.plan[type]=s.plan[type]||{}; s.plan[type][c]=s.plan[type][c]||{};
+      if (v) s.plan[type][c][month_key] = v;
+    }));
+  });
+  const resetPlan = () => { if (!confirm("Reset all categories and budget amounts to the original plan? Your logged transactions are kept.")) return;
+    update((s)=>{ s.categories = structuredClone(BASELINE.categories); s.plan = structuredClone(BASELINE.plan); }); };
+  const addEntry = (e) => update((s)=> s.entries.unshift(e));
+  const editEntry = (id, patch) => update((s)=> { s.entries = s.entries.map((x)=>x.id===id?{...x,...patch}:x); });
+  const deleteEntry = (id) => update((s)=> { s.entries = s.entries.filter((x)=>x.id!==id); });
+  const importTxns = (rows) => update((s)=> {
+    rows.forEach((r)=>{ if (!s.categories[r.type].includes(r.category)) s.categories[r.type].push(r.category); s.entries.unshift(r); });
+  });
+
+  /* ---- buckets ---- */
+  const addBucket = (name) => update((s)=>{ if(!s.buckets) s.buckets={}; if(s.buckets[name]) return; s.buckets[name]={name}; });
+  const renameBucket = (oldN,newN) => update((s)=>{ if(!s.buckets||!s.buckets[oldN]||newN===oldN) return; s.buckets[newN]={name:newN}; delete s.buckets[oldN]; s.entries.forEach((e)=>{ if(e.bucket===oldN) e.bucket=newN; }); });
+  const deleteBucket = (name) => update((s)=>{ if(!s.buckets||!s.buckets[name]) return; delete s.buckets[name]; s.entries.forEach((e)=>{ if(e.bucket===name) e.bucket=undefined; }); });
+  const setBucketForEntry = (id, b) => update((s)=>{ const e=s.entries.find((x)=>x.id===id); if(e) e.bucket=b||undefined; });
+
+  /* ---- end year archive ---- */
+  const endYear = async () => {
+    const yr = year;
+    if (!confirm(`Archive the ${yr} budget and start ${yr+1} fresh? Your ${yr} data is saved and viewable in Trends.`)) return;
+    try {
+      await window.saveArchive(yr, state);
+      update((s)=>{ TYPES.forEach((type)=>{ s.plan[type]={}; s.categories[type].forEach((c)=>{ s.plan[type][c]={}; }); }); });
+      setYear(yr+1); setMonth(1);
+      const a = await window.loadArchives(); setArchives(a||[]);
+      alert(`✓ ${yr} archived. You're now budgeting ${yr+1}.`);
+    } catch (e) { alert("Error archiving: " + e.message); }
+  };
+
+  const stepMonth = (d) => { let m=month+d, y=year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} setMonth(m); setYear(y); };
 
   if (!loaded || !state) return <div className="ap-root"><Styles/><p className="ap-loading">Loading…</p></div>;
 
@@ -308,33 +189,37 @@ function App({ session, onSignOut }) {
       <Styles/>
 
       {showLogoutWarning && (
-        <div className="ap-modal-overlay" onClick={stayLoggedIn}>
-          <div className="ap-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Session Timeout</h3>
-            <p>You'll be logged out in <b>{secondsLeft} seconds</b> due to inactivity.</p>
+        <div className="ap-modal-overlay" onClick={resetActivity}>
+          <div className="ap-modal" onClick={(e)=>e.stopPropagation()}>
+            <h3>Session timeout</h3>
+            <p>You'll be signed out in <b>{secondsLeft} seconds</b> due to inactivity.</p>
             <div className="ap-modal-actions">
-              <button className="ap-btn-primary" onClick={stayLoggedIn}>Stay Logged In</button>
-              <button className="ap-btn-secondary" onClick={handleLogout}>Log Out Now</button>
+              <button className="ap-modal-primary" onClick={resetActivity}>Stay signed in</button>
+              <button className="ap-modal-secondary" onClick={handleLogout}>Sign out now</button>
             </div>
           </div>
         </div>
       )}
 
-      <header className="ap-header">
-        <div className="ap-header-main">
-          <h1 className="ap-title">Ramirez Rojas <span className="ap-heart">♥ 💵</span></h1>
-          <p className="ap-kicker">Family Budget · {session?.user?.email} <button className="ap-signout" onClick={handleLogout}>Sign out</button></p>
-        </div>
-      </header>
-
-      <div className="ap-container">
-        <div className="ap-month-bar">
-          <button className="ap-nav" onClick={() => setMonth(month === 1 ? 12 : month - 1)}>&lt;</button>
-          <span className="ap-month">{MLABEL[month-1]} <span className="ap-chevron">◇</span></span>
-          <input className="ap-year-input" type="number" value={year} onChange={(e) => setYear(+e.target.value || year)} />
-          <button className="ap-nav" onClick={() => setMonth(month === 12 ? 1 : month + 1)}>&gt;</button>
-          <button className="ap-today" onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth()+1); }}>Today</button>
-        </div>
+      <div className="ap-wrap">
+        <header className="ap-head">
+          <div>
+            <div className="ap-kicker">Family Budget · <span className="ap-user">{session?.user?.email}</span> · <button className="ap-signout" onClick={handleLogout}>Sign out</button></div>
+            <h1 className="ap-title">Ramirez Rojas<span className="ap-heart">♥</span><span className="ap-bill">💵</span></h1>
+          </div>
+          <div className="ap-periodbox">
+            {saved && <span className="ap-saved">✓ saved</span>}
+            <div className="ap-period">
+              <button className="ap-arrow" onClick={()=>stepMonth(-1)} aria-label="Previous month">‹</button>
+              <select value={month} onChange={(e)=>setMonth(+e.target.value)}>
+                {MLABEL.map((l,i)=>(<option key={l} value={i+1}>{l}</option>))}
+              </select>
+              <input className="ap-year" type="number" value={year} onChange={(e)=>setYear(+e.target.value||year)} />
+              <button className="ap-arrow" onClick={()=>stepMonth(1)} aria-label="Next month">›</button>
+              <button className="ap-todaybtn" onClick={()=>{ const d=new Date(); setYear(d.getFullYear()); setMonth(d.getMonth()+1); }} title="Jump to current month">Today</button>
+            </div>
+          </div>
+        </header>
 
         <nav className="ap-tabs">
           {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","Year"],["trends","📊 Trends"]].map(([k,l])=>(
@@ -352,18 +237,20 @@ function App({ session, onSignOut }) {
             copyFrom={copyFrom} resetPlan={resetPlan}
             addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket}/>
         )}
-        {tab==="transactions" && (
-          <Transactions state={state} editEntry={editEntry} deleteEntry={deleteEntry} setBucketForEntry={setBucketForEntry}/>
-        )}
         {tab==="year" && (
-          <Year state={state} year={year} goMonth={(m) => setMonth(m)}/>
+          <Year state={state} year={year} goMonth={(m)=>{ setMonth(m); setTab("dashboard"); }}/>
+        )}
+        {tab==="transactions" && (
+          <Transactions state={state} editEntry={editEntry} deleteEntry={deleteEntry} importTxns={importTxns} setBucketForEntry={setBucketForEntry}/>
         )}
         {tab==="trends" && (
           <Trends state={state} archives={archives} currentYear={year}/>
         )}
-      </div>
 
-      <footer className="ap-foot">auto-save to your shared family budget and sync live across devices</footer>
+        <footer className="ap-foot">
+          Auto-saves to your shared family budget and syncs live across devices · {state.entries.length} records logged.
+        </footer>
+      </div>
     </div>
   );
 }
@@ -372,9 +259,9 @@ function App({ session, onSignOut }) {
 function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYear }) {
   const planAmt = (type, cat) => state.plan[type]?.[cat]?.[month_key] || 0;
   const monthEntries = state.entries.filter((e)=>e.date.slice(0,7)===month_key);
-  const expSpent = {};
-  monthEntries.filter((e)=>e.type==="Expenses").forEach((e)=>{ expSpent[e.category]=(expSpent[e.category]||0)+e.amount; });
+  const spentBy = (type) => { const o={}; monthEntries.filter((e)=>e.type===type).forEach((e)=>o[e.category]=(o[e.category]||0)+e.amount); return o; };
 
+  const expSpent = spentBy("Expenses");
   const envelopes = useMemo(() => {
     const cats = [...new Set([...state.categories.Expenses, ...Object.keys(expSpent)])];
     return cats.map((c)=>({ c, budget: planAmt("Expenses",c), spent: expSpent[c]||0 }))
@@ -405,72 +292,146 @@ function Dashboard({ state, year, month, month_key, addEntry, deleteEntry, endYe
           <span className="mono">{fmt(spentTotal)} / {fmt(expBudget)}</span>
         </div>
         <div className="ap-track ap-track-lg">
-          <div className="ap-fill" style={{width:Math.min(usedPct,100)+"%", background: usedPct>100?"var(--clay)":usedPct>85?"var(--navy)":"var(--emerald)"}}/>
+          <div className="ap-fill" style={{width:Math.min(usedPct,100)+"%",
+            background: usedPct>100?"var(--clay)":usedPct>85?"var(--navy)":"var(--emerald)"}}/>
         </div>
         {savBudget>0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget-expBudget-savBudget)}</div>}
-        <button className="ap-end-year-btn" onClick={endYear} title="Archive this year and start fresh">End Year {year}</button>
+        <button className="ap-endyear" onClick={endYear} title="Archive this year and start fresh">End Year {year}</button>
       </div>
 
-      <section className="ap-envelopes">
-        <h3>Expense breakdown</h3>
-        {envelopes.length > 0 ? envelopes.map((e) => (
-          <div key={e.c} className="ap-envelope">
-            <div className="ap-env-label">
-              <span className="ap-cat-name">{e.c}</span>
-              <span className="ap-cat-amounts">{fmt(e.spent)} / {fmt(e.budget)}</span>
-            </div>
-            <div className="ap-track">
-              <div className="ap-fill" style={{width: e.budget>0 ? Math.min((e.spent/e.budget)*100,100)+"%" : "0%", background: e.spent>e.budget?"var(--clay)":e.spent>e.budget*0.85?"var(--navy)":"var(--emerald)"}}/>
-            </div>
-          </div>
-        )) : <p className="ap-empty">No budgeted categories</p>}
+      <AddBar state={state} month_key={month_key} addEntry={addEntry}/>
+
+      <section className="ap-env-grid">
+        {envelopes.map((e)=>(
+          <Envelope key={e.c} env={e}
+            items={monthEntries.filter((x)=>x.type==="Expenses"&&x.category===e.c)}
+            month_key={month_key} addEntry={addEntry}
+            onDelete={deleteEntry}/>
+        ))}
+        {envelopes.length===0 && <p className="ap-loading">No expense budget or spending for {MLABEL[month-1]} {year}. Set one in Planning.</p>}
       </section>
 
-      <section className="ap-add-entry">
-        <h3>Add transaction</h3>
-        <EntryForm state={state} month_key={month_key} onAdd={addEntry} month={month}/>
-      </section>
+      <MiniPanel title="Savings" rows={state.categories.Savings} planAmt={(c)=>planAmt("Savings",c)} spent={spentBy("Savings")} accent="teal" verb="saved"/>
+      <MiniPanel title="Income received" rows={state.categories.Income} planAmt={(c)=>planAmt("Income",c)} spent={spentBy("Income")} accent="emerald" verb="received"/>
     </>
-  );
-}
-
-function EntryForm({ state, month_key, onAdd, month }) {
-  const [type, setType] = useState("Expenses");
-  const [cat, setCat] = useState(state.categories[type][0] || "");
-  const [amount, setAmount] = useState("");
-  const [name, setName] = useState("");
-  const [date, setDate] = useState(month_key + "-01");
-  const [bucket, setBucket] = useState("");
-
-  const cats = state.categories[type] || [];
-
-  return (
-    <div className="ap-entry-form">
-      <input type="date" value={date} onChange={(e)=>setDate(e.target.value)} className="ap-date-input" />
-      <select value={type} onChange={(e)=>{ setType(e.target.value); setCat(state.categories[e.target.value][0]||""); }} className="ap-type-select">
-        {TYPES.map((t)=>(<option key={t} value={t}>{t}</option>))}
-      </select>
-      <select value={cat} onChange={(e)=>setCat(e.target.value)} className="ap-cat-select">
-        {cats.map((c)=>(<option key={c} value={c}>{c}</option>))}
-      </select>
-      <input type="text" placeholder="Merchant (Netflix, Whole Foods...)" value={name} onChange={(e)=>setName(e.target.value)} className="ap-name-input" />
-      <input type="number" placeholder="0.00" value={amount} onChange={(e)=>setAmount(e.target.value)} className="ap-amount-input" />
-      {type === "Expenses" && (
-        <select value={bucket} onChange={(e)=>setBucket(e.target.value)} className="ap-bucket-select">
-          <option value="">No bucket</option>
-          {Object.keys(state.buckets || {}).map((b)=>(<option key={b} value={b}>{b}</option>))}
-        </select>
-      )}
-      <button className="ap-btn-add" onClick={()=>{ const amt=parseFloat(amount); if(amt>0 && name.trim()){ onAdd(type, date, cat, amt, name.trim()); setAmount(""); setName(""); setBucket(""); } }}>Add</button>
-    </div>
   );
 }
 
 function Stat({ label, val, color, hero }) {
   return (
-    <div className={`ap-stat ${hero?"hero":""}`} style={color ? { "--stat-color": color } : {}}>
-      <span className="ap-stat-label">{label}</span>
-      <b className="ap-stat-val">{fmt(val)}</b>
+    <div className={"ap-stat"+(hero?" hero":"")}>
+      <span className="lbl">{label}</span>
+      <span className="val" style={color&&!hero?{color}:undefined}>{fmt(val)}</span>
+    </div>
+  );
+}
+
+function Envelope({ env, items, month_key, addEntry, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [amt, setAmt] = useState("");
+  const [note, setNote] = useState("");
+  const pct = env.budget>0 ? (env.spent/env.budget)*100 : (env.spent>0?120:0);
+  const over = env.budget>0 && env.spent>env.budget;
+  const color = over ? "var(--clay)" : pct>85 ? "var(--navy)" : "var(--emerald)";
+  const todayISO = new Date().toISOString().slice(0,10);
+  const defDate = todayISO.slice(0,7)===month_key ? todayISO : month_key + "-01";
+  const submit = () => {
+    const a = parseFloat(amt); if (!a || a<=0) return;
+    addEntry({ id: uid(), date: defDate, type:"Expenses", category: env.c, amount: Math.round(a*100)/100, note: note.trim() });
+    setAmt(""); setNote(""); setAdding(false);
+  };
+  return (
+    <div className={"ap-env"+(over?" over":"")}>
+      <div className="ap-env-top">
+        <span className="ap-env-name" onClick={()=>items.length&&setOpen(!open)} style={{cursor:items.length?"pointer":"default"}}>
+          {env.c}{items.length>0 && <em className="ap-cnt">{items.length}</em>}</span>
+        <span className="ap-env-rem" style={{color: over?"var(--clay)":"var(--ink-soft)"}}>
+          {env.budget>0 ? (over?fmt(Math.abs(env.remaining))+" over":fmt(env.remaining)+" left") : "unbudgeted"}
+        </span>
+      </div>
+      <div className="ap-track"><div className="ap-fill" style={{width:Math.min(pct,100)+"%",background:color}}/></div>
+      <div className="ap-env-foot">
+        <span className="mono">{fmt(env.spent)} <span className="dim">{env.budget>0?"of "+fmt(env.budget):"no budget"}</span></span>
+        <button className="ap-envadd" onClick={()=>setAdding(!adding)}>{adding?"Cancel":"+ Add"}</button>
+      </div>
+      {adding && (
+        <div className="ap-envform">
+          <span className="cur">$</span>
+          <input className="amt" type="number" autoFocus placeholder="0.00" value={amt}
+            onChange={(e)=>setAmt(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          <input className="note" type="text" placeholder="note (optional)" value={note}
+            onChange={(e)=>setNote(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          <button className="ap-envgo" onClick={submit}>Log</button>
+        </div>
+      )}
+      {open && (
+        <ul className="ap-env-items">
+          {items.map((x)=>(
+            <li key={x.id}><span className="d">{x.date.slice(8)}</span>
+              <span className="n">{x.note||x.name||"—"}</span>
+              <span className="a mono">{fmt2(x.amount)}</span>
+              <button className="x" onClick={()=>onDelete(x.id)} title="Delete">×</button></li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function MiniPanel({ title, rows, planAmt, spent, accent, verb }) {
+  const list = [...new Set([...rows, ...Object.keys(spent)])].filter((c)=> planAmt(c)>0 || (spent[c]||0)>0);
+  if (list.length===0) return null;
+  return (
+    <section className="ap-mini">
+      <h3 className="ap-mini-t">{title}</h3>
+      <div className="ap-mini-rows">
+        {list.map((c)=>{
+          const target = planAmt(c), got = spent[c]||0;
+          const pct = target>0 ? Math.min((got/target)*100,100) : (got>0?100:0);
+          return (<div key={c} className="ap-mini-row">
+            <span className="nm">{c}</span>
+            <div className="ap-track ap-track-sm"><div className="ap-fill" style={{width:pct+"%",background:`var(--${accent})`}}/></div>
+            <span className="mono vl">{fmt(got)} <span className="dim">{target>0?"/ "+fmt(target):verb}</span></span>
+          </div>);
+        })}
+      </div>
+    </section>
+  );
+}
+
+function AddBar({ state, month_key, addEntry }) {
+  const [type, setType] = useState("Expenses");
+  const [category, setCategory] = useState(state.categories.Expenses[0] || "");
+  const todayISO = new Date().toISOString().slice(0,10);
+  const dflt = () => todayISO.slice(0,7)===month_key ? todayISO : month_key + "-01";
+  const [date, setDate] = useState(dflt());
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  useEffect(()=>{ setDate(dflt()); }, [month_key]);
+  const cats = state.categories[type] || [];
+  useEffect(()=>{ if (!cats.includes(category)) setCategory(cats[0]||""); }, [type]);
+
+  const add = () => {
+    const amt = parseFloat(amount); if (!amt || amt<=0 || !category) return;
+    addEntry({ id: uid(), date, type, category, amount: Math.round(amt*100)/100, note: note.trim() });
+    setAmount(""); setNote("");
+  };
+  return (
+    <div className="ap-addbar">
+      <span className="ap-add-lbl">Log</span>
+      <select value={type} onChange={(e)=>setType(e.target.value)}>
+        {TYPES.map((t)=>(<option key={t}>{t}</option>))}
+      </select>
+      <select className="wide" value={category} onChange={(e)=>setCategory(e.target.value)}>
+        {cats.map((c)=>(<option key={c}>{c}</option>))}
+      </select>
+      <input type="date" value={date} onChange={(e)=>setDate(e.target.value)}/>
+      <input className="amt" type="number" placeholder="0.00" value={amount}
+        onChange={(e)=>setAmount(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&add()}/>
+      <input className="note" type="text" placeholder="note (optional)" value={note}
+        onChange={(e)=>setNote(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&add()}/>
+      <button className="ap-addbtn" onClick={add}>Add</button>
     </div>
   );
 }
@@ -493,47 +454,70 @@ function Planning({ state, year, month, month_key, setPlanAmt, addCat, removeCat
         <div className="ap-plan-actions">
           <div className="ap-copyfrom">
             <span>Copy from</span>
-            <select value={srcM} onChange={(e)=>setSrcM(+e.target.value)}>{MLABEL.map((l,i)=>(<option key={l} value={i+1}>{l}</option>))}</select>
+            <select value={srcM} onChange={(e)=>setSrcM(+e.target.value)}>
+              {MLABEL.map((l,i)=>(<option key={l} value={i+1}>{l}</option>))}
+            </select>
             <input className="src-year" type="number" value={srcY} onChange={(e)=>setSrcY(+e.target.value||srcY)}/>
             <button onClick={()=>copyFrom(mk(srcY,srcM))}>Copy</button>
           </div>
           <button className="ghost" onClick={resetPlan}>Reset to original</button>
         </div>
       </div>
-      <p className="ap-plan-hint">Editing budget for <b>{MLABEL[month-1]} {month_key.slice(0,4)}</b>.</p>
+      <p className="ap-plan-hint">Editing budget for <b>{MLABEL[month-1]} {month_key.slice(0,4)}</b>. Aim to bring "To allocate" to $0 (zero-based budgeting).</p>
 
-      <div className="ap-buckets-manager">
-        <h3>Manage Buckets</h3>
-        <p className="ap-buckets-hint">Create optional buckets to group transactions (e.g., "Subscriptions" for Netflix, Spotify, etc.)</p>
-        <div className="ap-buckets-list">
-          {Object.keys(state.buckets || {}).map((bname) => (
-            <div key={bname} className="ap-bucket-item">
-              <input className="ap-bucket-name" value={bname} onChange={(e) => {
-                const newName = e.target.value.trim();
-                if (newName && newName !== bname) renameBucket(bname, newName);
-              }} />
-              <span className="ap-bucket-count">{((state.entries || []).filter((e) => e.bucket === bname).length)} items</span>
-              <button className="ap-bucket-delete" onClick={() => { if (confirm(`Delete bucket "${bname}"?`)) deleteBucket(bname); }}>Delete</button>
-            </div>
-          ))}
-        </div>
-        <div className="ap-add-bucket">
-          <input className="ap-bucket-input" type="text" placeholder="New bucket name" onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              const val = e.target.value.trim();
-              if (val && !state.buckets?.[val]) { addBucket(val); e.target.value = ""; }
-            }
-          }} />
-          <button onClick={(e) => {
-            const inp = e.target.parentElement.querySelector(".ap-bucket-input");
-            const val = inp.value.trim();
-            if (val && !state.buckets?.[val]) { addBucket(val); inp.value = ""; }
-          }}>+ Add Bucket</button>
-        </div>
-      </div>
+      <BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket}/>
 
-      {TYPES.map((type)=>(<PlanSection key={type} type={type} cats={state.categories[type]} planAmt={(c)=>planAmt(type,c)} total={total(type)} setPlanAmt={(c,v)=>setPlanAmt(type,c,month_key,v)} addCat={(n)=>addCat(type,n)} removeCat={(c)=>removeCat(type,c)} renameCat={(o,n)=>renameCat(type,o,n)}/>))}
+      {TYPES.map((type)=>(
+        <PlanSection key={type} type={type} cats={state.categories[type]} planAmt={(c)=>planAmt(type,c)}
+          total={total(type)} setPlanAmt={(c,v)=>setPlanAmt(type,c,month_key,v)}
+          addCat={(n)=>addCat(type,n)} removeCat={(c)=>removeCat(type,c)} renameCat={(o,n)=>renameCat(type,o,n)}/>
+      ))}
     </section>
+  );
+}
+
+function BucketManager({ state, addBucket, renameBucket, deleteBucket }) {
+  const [newB, setNewB] = useState("");
+  const buckets = Object.keys(state.buckets || {});
+  const count = (b) => (state.entries||[]).filter((e)=>e.bucket===b).length;
+  const add = () => { const v=newB.trim(); if(v && !state.buckets?.[v]){ addBucket(v); setNewB(""); } };
+  return (
+    <div className="ap-plansec">
+      <div className="ap-plansec-head">
+        <h3 style={{color:"var(--navy)"}}>Buckets</h3>
+        <span className="mono total">{buckets.length}</span>
+      </div>
+      <p className="ap-plan-hint" style={{margin:"2px 0 10px"}}>Optional groups for transactions (e.g. "Subscriptions" for Netflix, Disney+…). Assign them in Tracking.</p>
+      <div className="ap-planrows">
+        {buckets.map((b)=>(
+          <div key={b} className="ap-planrow">
+            <BucketName name={b} onRename={(n)=>renameBucket(b,n)}/>
+            <span className="mono dim" style={{fontSize:12}}>{count(b)} items</span>
+            <button className="ap-del" onClick={()=>{ if(confirm(`Delete bucket "${b}"? Transactions stay, they just lose this tag.`)) deleteBucket(b); }} title="Remove bucket">×</button>
+          </div>
+        ))}
+        {buckets.length===0 && <p className="ap-empty">No buckets yet.</p>}
+      </div>
+      <div className="ap-addcat">
+        <input type="text" placeholder="+ add bucket" value={newB}
+          onChange={(e)=>setNewB(e.target.value)} onKeyDown={(e)=>{ if(e.key==="Enter") add(); }}/>
+        <button onClick={add}>Add</button>
+      </div>
+    </div>
+  );
+}
+
+function BucketName({ name, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  useEffect(()=>setDraft(name),[name]);
+  return editing ? (
+    <input className="ap-renamein" value={draft} autoFocus
+      onChange={(e)=>setDraft(e.target.value)}
+      onBlur={()=>{ onRename(draft); setEditing(false); }}
+      onKeyDown={(e)=>{ if(e.key==="Enter"){ onRename(draft); setEditing(false);} if(e.key==="Escape"){ setDraft(name); setEditing(false);} }}/>
+  ) : (
+    <span className="ap-planrow-name" onClick={()=>setEditing(true)} title="Click to rename">{name}</span>
   );
 }
 
@@ -542,127 +526,314 @@ function PlanSection({ type, cats, planAmt, total, setPlanAmt, addCat, removeCat
   const tone = type==="Income"?"emerald":type==="Savings"?"teal":"clay";
   return (
     <div className="ap-plansec">
-      <div className={`ap-plansec-head ap-${tone}`}>
-        <h3>{type}</h3>
-        <b>{fmt(total)}</b>
+      <div className="ap-plansec-head">
+        <h3 style={{color:`var(--${tone})`}}>{type}</h3>
+        <span className="mono total">{fmt(total)}</span>
       </div>
-      <div className="ap-plansec-cats">
+      <div className="ap-planrows">
         {cats.map((c)=>(
-          <div key={c} className="ap-plancat">
-            <input type="text" value={c} onChange={(e)=>renameCat(c, e.target.value)} className="ap-catname" />
-            <input type="number" placeholder="0" value={planAmt(c)||""} onChange={(e)=>setPlanAmt(c, +e.target.value||0)} className="ap-catamt" />
-            <button className="ap-del" onClick={()=>removeCat(c)}>✕</button>
-          </div>
+          <PlanRow key={c} name={c} amount={planAmt(c)}
+            onAmount={(v)=>setPlanAmt(c,v)} onRename={(n)=>renameCat(c,n)} onRemove={()=>removeCat(c)}/>
         ))}
+        {cats.length===0 && <p className="ap-empty">No categories yet.</p>}
       </div>
       <div className="ap-addcat">
-        <input type="text" placeholder={`Add ${type.toLowerCase()}...`} value={newCat} onChange={(e)=>setNewCat(e.target.value)} onKeyDown={(e)=>{ if(e.key==="Enter" && newCat.trim()){ addCat(newCat.trim()); setNewCat(""); } }} />
-        <button onClick={()=>{ if(newCat.trim()){ addCat(newCat.trim()); setNewCat(""); } }}>+ Add</button>
+        <input type="text" placeholder={"+ add "+type.toLowerCase().replace(/s$/,"")+" category"} value={newCat}
+          onChange={(e)=>setNewCat(e.target.value)}
+          onKeyDown={(e)=>{ if(e.key==="Enter"){ addCat(newCat); setNewCat(""); } }}/>
+        <button onClick={()=>{ addCat(newCat); setNewCat(""); }}>Add</button>
       </div>
     </div>
   );
 }
 
-/* ================= TRANSACTIONS ================= */
-function Transactions({ state, editEntry, deleteEntry, setBucketForEntry }) {
-  const [filterCat, setFilterCat] = useState("");
-  const entries = (state.entries || []).filter((e) => !filterCat || e.category === filterCat).sort((a,b) => new Date(b.date) - new Date(a.date));
+function PlanRow({ name, amount, onAmount, onRename, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  useEffect(()=>setDraft(name),[name]);
   return (
-    <section className="ap-txns">
-      <h3>All Transactions</h3>
-      <select value={filterCat} onChange={(e)=>setFilterCat(e.target.value)} className="ap-filter-cat">
-        <option value="">All categories</option>
-        {state.categories.Expenses.map((c)=>(<option key={c} value={c}>{c}</option>))}
-      </select>
-      <div className="ap-txns-list">
-        {entries.length > 0 ? entries.map((e) => (
-          <div key={e.id} className="ap-txn-row">
-            <div className="ap-txn-info">
-              <span className="ap-txn-name">{e.name}</span>
-              <span className="ap-txn-cat">{e.category}</span>
-              {e.bucket && <span className="ap-txn-bucket">{e.bucket}</span>}
-              <span className="ap-txn-date">{e.date}</span>
-            </div>
-            <div className="ap-txn-actions">
-              <span className="ap-txn-amt">{fmt(e.amount)}</span>
-              {e.type === "Expenses" && (
-                <select value={e.bucket || ""} onChange={(ev)=>setBucketForEntry(e.id, ev.target.value || undefined)} className="ap-txn-bucket-select">
-                  <option value="">No bucket</option>
-                  {Object.keys(state.buckets || {}).map((b)=>(<option key={b} value={b}>{b}</option>))}
-                </select>
-              )}
-              <button className="ap-del" onClick={()=>deleteEntry(e.id)}>✕</button>
-            </div>
-          </div>
-        )) : <p className="ap-empty">No transactions</p>}
+    <div className="ap-planrow">
+      {editing ? (
+        <input className="ap-renamein" value={draft} autoFocus
+          onChange={(e)=>setDraft(e.target.value)}
+          onBlur={()=>{ onRename(draft); setEditing(false); }}
+          onKeyDown={(e)=>{ if(e.key==="Enter"){ onRename(draft); setEditing(false);} if(e.key==="Escape"){ setDraft(name); setEditing(false);} }}/>
+      ) : (
+        <span className="ap-planrow-name" onClick={()=>setEditing(true)} title="Click to rename">{name}</span>
+      )}
+      <div className="ap-amtwrap">
+        <span className="cur">$</span>
+        <input type="number" min="0" step="1" value={amount||""} placeholder="0"
+          onChange={(e)=>onAmount(parseFloat(e.target.value)||0)}/>
       </div>
-    </section>
+      <button className="ap-del" onClick={onRemove} title="Remove category">×</button>
+    </div>
   );
 }
 
-/* ================= YEAR VIEW ================= */
-function Year({ state, year, goMonth }) {
-  const monthData = useMemo(() => {
-    const data = [];
-    MLABEL.forEach((_, m) => {
-      const mk_val = mk(year, m+1);
-      const entries = state.entries.filter((e) => e.date.slice(0,7) === mk_val && e.type === "Expenses");
-      const spent = entries.reduce((a,e)=>a+e.amount,0);
-      const budgeted = state.categories.Expenses.reduce((a,c)=>a+(state.plan.Expenses?.[c]?.[mk_val]||0),0);
-      data.push({ month: m+1, spent, budgeted, remaining: budgeted - spent });
-    });
-    return data;
-  }, [state, year]);
+/* ================= TRANSACTIONS ================= */
+function Transactions({ state, editEntry, deleteEntry, importTxns, setBucketForEntry }) {
+  const [q, setQ] = useState("");
+  const [ftype, setFtype] = useState("All");
+  const [fcat, setFcat] = useState("All");
+  const [editId, setEditId] = useState(null);
+  const [msg, setMsg] = useState("");
+  const fileRef = useRef(null);
+  const buckets = Object.keys(state.buckets || {});
+
+  const norm = (s)=> (s==null?"":String(s)).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const catOptions = useMemo(()=>{
+    const base = ftype==="All"
+      ? [...state.categories.Income, ...state.categories.Expenses, ...state.categories.Savings]
+      : [...(state.categories[ftype]||[])];
+    const fromEntries = state.entries.filter((e)=> ftype==="All"||e.type===ftype).map((e)=>e.category);
+    return [...new Set([...base, ...fromEntries])].sort((a,b)=>a.localeCompare(b));
+  }, [state, ftype]);
+
+  const nq = norm(q);
+  const list = state.entries
+    .filter((x)=> ftype==="All" ? true : x.type===ftype)
+    .filter((x)=> fcat==="All" ? true : x.category===fcat)
+    .filter((x)=> nq==="" ? true : (norm(x.category).includes(nq) || norm(x.note).includes(nq) || norm(x.name).includes(nq)))
+    .slice().sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
+
+  const net = list.reduce((a,b)=> b.type==="Income"?a+b.amount:b.type==="Expenses"?a-b.amount:a, 0);
+  const allCats = (t) => state.categories[t] || [];
+
+  const exportCsv = () => {
+    const rows = state.entries.slice().sort((a,b)=> a.date<b.date?1:-1)
+      .map((e)=>({ Date:e.date, Type:e.type, Category:e.category, Amount:e.amount, Note:e.note||e.name||"", Bucket:e.bucket||"" }));
+    const csv = Papa.unparse(rows.length?rows:[{Date:"",Type:"",Category:"",Amount:"",Note:"",Bucket:""}]);
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "budget-transactions.csv"; a.click();
+  };
+
+  const onFile = (ev) => {
+    const f = ev.target.files?.[0]; if (!f) return;
+    Papa.parse(f, { header:true, skipEmptyLines:true, complete:(res)=>{
+      const valid = []; let skipped = 0;
+      res.data.forEach((row)=>{
+        const get = (k)=>{ const kk = Object.keys(row).find((x)=>x.toLowerCase().trim()===k); return kk ? String(row[kk]).trim() : ""; };
+        const date = get("date"); let type = get("type"); const category = get("category");
+        const amount = parseFloat(String(get("amount")).replace(/[$,]/g,"")); const note = get("note"); const bucket = get("bucket");
+        type = TYPES.find((t)=>t.toLowerCase()===type.toLowerCase());
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !type || !category || !amount || amount<=0) { skipped++; return; }
+        valid.push({ id: uid(), date, type, category, amount: Math.round(amount*100)/100, note, bucket: bucket||undefined });
+      });
+      if (valid.length) importTxns(valid);
+      setMsg(`Imported ${valid.length} record${valid.length===1?"":"s"}${skipped?`, skipped ${skipped} invalid`:""}.`);
+      setTimeout(()=>setMsg(""), 5000);
+      ev.target.value = "";
+    }});
+  };
 
   return (
-    <section className="ap-year">
-      <h3>{year} Overview</h3>
-      <div className="ap-year-chart">
-        <svg viewBox="0 0 500 300" preserveAspectRatio="xMidYMid meet">
-          <g>{monthData.map((d,i)=>{ const x=30+i*37; const y_budget=250-(d.budgeted/5000)*200; const y_spent=250-(d.spent/5000)*200; return (<g key={i}><rect x={x-8} y={y_spent} width="7" height={250-y_spent} fill="var(--clay)" opacity="0.7"/><rect x={x-1} y={y_budget} width="7" height={250-y_budget} fill="var(--navy)" opacity="0.5"/><text x={x} y="270" fontSize="10" textAnchor="middle">{MLABEL[i].slice(0,1)}</text></g>); })}</g>
-        </svg>
+    <section className="ap-card">
+      <div className="ap-filtbar">
+        <input className="ap-search" type="text" placeholder="Search category or note…" value={q} onChange={(e)=>setQ(e.target.value)}/>
+        <select value={ftype} onChange={(e)=>{ setFtype(e.target.value); setFcat("All"); }}>
+          {["All",...TYPES].map((t)=>(<option key={t}>{t}</option>))}
+        </select>
+        <select value={fcat} onChange={(e)=>setFcat(e.target.value)}>
+          <option value="All">All categories</option>
+          {catOptions.map((c)=>(<option key={c} value={c}>{c}</option>))}
+        </select>
+        <button className="ap-iobtn" onClick={exportCsv}>Export CSV</button>
+        <button className="ap-iobtn" onClick={()=>fileRef.current?.click()}>Import CSV</button>
+        <input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={onFile}/>
+        <div className="ap-count">{list.length} records · net <b style={{color:net>=0?"var(--emerald)":"var(--clay)"}}>{fmt(net)}</b></div>
       </div>
-      <div className="ap-year-table">
-        <table>
-          <thead><tr><th>Month</th><th className="r">Budgeted</th><th className="r">Spent</th><th className="r">Remaining</th></tr></thead>
-          <tbody>{monthData.map((d)=>(<tr key={d.month} onClick={()=>goMonth(d.month)} style={{cursor:"pointer"}}><td>{MLABEL[d.month-1]}</td><td className="r mono">{fmt(d.budgeted)}</td><td className="r mono">{fmt(d.spent)}</td><td className="r mono" style={{color: d.remaining<0?"var(--clay)":"var(--emerald)"}}>{fmt(d.remaining)}</td></tr>))}</tbody>
+      {msg && <div className="ap-importmsg">{msg}</div>}
+      <div className="ap-txnscroll">
+        <table className="ap-txntable">
+          <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Note</th><th>Bucket</th><th className="r">Amount</th><th></th></tr></thead>
+          <tbody>
+            {list.map((x)=> editId===x.id ? (
+              <tr key={x.id} className="editing">
+                <td><input type="date" value={x.date} onChange={(e)=>editEntry(x.id,{date:e.target.value})}/></td>
+                <td><select value={x.type} onChange={(e)=>{const t=e.target.value; editEntry(x.id,{type:t, category: allCats(t).includes(x.category)?x.category:(allCats(t)[0]||x.category)});}}>
+                  {TYPES.map((t)=>(<option key={t}>{t}</option>))}</select></td>
+                <td><select value={x.category} onChange={(e)=>editEntry(x.id,{category:e.target.value})}>
+                  {[...new Set([...allCats(x.type), x.category])].map((c)=>(<option key={c}>{c}</option>))}</select></td>
+                <td><input type="text" value={x.note||x.name||""} onChange={(e)=>editEntry(x.id,{note:e.target.value})}/></td>
+                <td><select value={x.bucket||""} onChange={(e)=>setBucketForEntry(x.id, e.target.value||undefined)}>
+                  <option value="">—</option>
+                  {buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}</select></td>
+                <td className="r"><input className="amt" type="number" value={x.amount} onChange={(e)=>editEntry(x.id,{amount:Math.round((parseFloat(e.target.value)||0)*100)/100})}/></td>
+                <td><button className="ap-rowbtn done" onClick={()=>setEditId(null)}>Done</button></td>
+              </tr>
+            ) : (
+              <tr key={x.id}>
+                <td className="mono nowrap">{x.date}</td>
+                <td><span className={"chip chip-"+x.type.toLowerCase()}>{x.type}</span></td>
+                <td className="cat">{x.category}</td>
+                <td className="det">{x.note||x.name||<span className="dim">—</span>}</td>
+                <td>{x.bucket ? <span className="bchip">{x.bucket}</span> : (x.type==="Expenses" && buckets.length>0 ?
+                  <select className="bsel" value="" onChange={(e)=>setBucketForEntry(x.id, e.target.value||undefined)}>
+                    <option value="">+ tag</option>{buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}
+                  </select> : <span className="dim">—</span>)}</td>
+                <td className="r mono" style={{color:x.type==="Income"?"var(--emerald)":x.type==="Savings"?"var(--teal)":"var(--ink)"}}>
+                  {x.type==="Income"?"+":"−"}{fmt2(x.amount)}</td>
+                <td className="rowacts">
+                  <button className="ap-rowbtn" onClick={()=>setEditId(x.id)}>Edit</button>
+                  <button className="ap-rowbtn del" onClick={()=>deleteEntry(x.id)}>×</button>
+                </td>
+              </tr>
+            ))}
+            {list.length===0 && <tr><td colSpan={7} className="ap-empty">{state.entries.length ? "No transactions match these filters." : "No transactions yet — log some from the Dashboard."}</td></tr>}
+          </tbody>
         </table>
       </div>
     </section>
   );
 }
 
+/* ================= YEAR ================= */
+function YearChart({ data }) {
+  const W = 720, H = 240, padL = 46, padR = 12, padT = 14, padB = 26;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const top = Math.max(1, ...data.map(d => Math.max(d.Income, d.Expenses, d.Net)));
+  const bottom = Math.min(0, ...data.map(d => d.Net));
+  const range = (top - bottom) || 1;
+  const y = (v) => padT + innerH * (1 - (v - bottom) / range);
+  const groupW = innerW / data.length;
+  const barW = Math.min(12, groupW * 0.3);
+  const ticks = 4;
+  const grid = Array.from({ length: ticks + 1 }, (_, i) => bottom + range * i / ticks);
+  const zero = y(0);
+  const pts = data.map((d, i) => [padL + groupW * (i + 0.5), y(d.Net)]);
+  const linePath = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  return (
+    <svg viewBox={"0 0 " + W + " " + H} width="100%" height="240" preserveAspectRatio="xMidYMid meet">
+      {grid.map((gv, i) => (
+        <g key={i}>
+          <line x1={padL} x2={W - padR} y1={y(gv)} y2={y(gv)} stroke="var(--line)" strokeWidth="1" />
+          <text x={padL - 7} y={y(gv) + 3} textAnchor="end" fontSize="9" fontFamily="JetBrains Mono" fill="var(--ink-soft)">
+            {"$" + Math.round(gv / 1000) + "k"}</text>
+        </g>
+      ))}
+      {data.map((d, i) => {
+        const cx = padL + groupW * (i + 0.5);
+        return (
+          <g key={d.name}>
+            <rect x={cx - barW - 1} y={Math.min(y(d.Income), zero)} width={barW} height={Math.abs(zero - y(d.Income))} fill="var(--emerald)" rx="2">
+              <title>{d.name + " Income: $" + d.Income.toLocaleString()}</title></rect>
+            <rect x={cx + 1} y={Math.min(y(d.Expenses), zero)} width={barW} height={Math.abs(zero - y(d.Expenses))} fill="var(--clay)" rx="2">
+              <title>{d.name + " Expenses: $" + d.Expenses.toLocaleString()}</title></rect>
+            <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill="var(--ink-soft)">{d.name}</text>
+          </g>
+        );
+      })}
+      <path d={linePath} fill="none" stroke="var(--navy)" strokeWidth="2.5" />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p[0]} cy={p[1]} r="2.7" fill="var(--navy)">
+          <title>{data[i].name + " Net: $" + data[i].Net.toLocaleString()}</title></circle>
+      ))}
+    </svg>
+  );
+}
+
+function Year({ state, year, goMonth }) {
+  const planExp = (m) => state.categories.Expenses.reduce((a,c)=> a + (state.plan.Expenses?.[c]?.[mk(year,m)]||0), 0);
+  const rows = useMemo(() => Array.from({length:12}, (_,i)=>{
+    const m = i+1, key = mk(year,m);
+    const ent = state.entries.filter((e)=>e.date.slice(0,7)===key);
+    const inc = ent.filter((e)=>e.type==="Income").reduce((a,e)=>a+e.amount,0);
+    const exp = ent.filter((e)=>e.type==="Expenses").reduce((a,e)=>a+e.amount,0);
+    const sav = ent.filter((e)=>e.type==="Savings").reduce((a,e)=>a+e.amount,0);
+    return { m, label: MLABEL[i], inc, exp, sav, budget: planExp(m), net: inc-exp, count: ent.length };
+  }), [state, year]);
+
+  const tot = rows.reduce((a,r)=>({inc:a.inc+r.inc, exp:a.exp+r.exp, sav:a.sav+r.sav, budget:a.budget+r.budget}),{inc:0,exp:0,sav:0,budget:0});
+
+  const catMap = {};
+  state.entries.filter((e)=>e.type==="Expenses" && e.date.slice(0,4)===String(year))
+    .forEach((e)=>{ catMap[e.category]=(catMap[e.category]||0)+e.amount; });
+  const topCats = Object.entries(catMap).map(([c,v])=>({c,v})).sort((a,b)=>b.v-a.v).slice(0,10);
+  const maxCat = topCats[0]?.v || 1;
+
+  const chartData = rows.map((r)=>({ name:r.label, Income:Math.round(r.inc), Expenses:Math.round(r.exp), Net:Math.round(r.net) }));
+  const hasData = tot.inc>0 || tot.exp>0;
+
+  return (
+    <>
+      <section className="ap-summary">
+        <Stat label={year+" income"} val={tot.inc} color="var(--emerald)"/>
+        <Stat label="Expenses" val={tot.exp} color="var(--clay)"/>
+        <Stat label="Saved" val={tot.sav} color="var(--teal)"/>
+        <Stat label="Net" val={tot.inc-tot.exp} color={(tot.inc-tot.exp)<0?"var(--clay)":"var(--ink)"} hero/>
+      </section>
+
+      <div className="ap-card" style={{marginBottom:16}}>
+        <h3 className="ap-mini-t" style={{marginBottom:6}}>Monthly flow · {year}</h3>
+        {hasData ? <YearChart data={chartData}/> : <p className="ap-empty">No transactions logged in {year} yet.</p>}
+        <div className="ap-legend"><span><i style={{background:"var(--emerald)"}}/>Income</span>
+          <span><i style={{background:"var(--clay)"}}/>Expenses</span><span><i style={{background:"var(--navy)"}}/>Net</span></div>
+      </div>
+
+      <div className="ap-yeargrid">
+        <div className="ap-card">
+          <h3 className="ap-mini-t">By month</h3>
+          <table className="ap-yeartable">
+            <thead><tr><th>Month</th><th className="r">Budget</th><th className="r">Spent</th><th className="r">Δ</th><th className="r">Net</th></tr></thead>
+            <tbody>
+              {rows.map((r)=>{
+                const d = r.budget - r.exp;
+                return (
+                  <tr key={r.m} onClick={()=>goMonth(r.m)} title="Open this month">
+                    <td className="mlbl">{r.label}{r.count>0 && <em className="ap-cnt">{r.count}</em>}</td>
+                    <td className="r mono dim">{r.budget?fmt(r.budget):"—"}</td>
+                    <td className="r mono">{r.exp?fmt(r.exp):"—"}</td>
+                    <td className="r mono" style={{color: r.budget? (d>=0?"var(--emerald)":"var(--clay)"):"var(--ink-soft)"}}>{r.budget?((d>=0?"+":"")+fmt(d)):"—"}</td>
+                    <td className="r mono" style={{color: r.net>=0?"var(--emerald)":"var(--clay)"}}>{(r.inc||r.exp)?fmt(r.net):"—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot><tr><td>Total</td><td className="r mono dim">{fmt(tot.budget)}</td><td className="r mono">{fmt(tot.exp)}</td>
+              <td className="r mono" style={{color:(tot.budget-tot.exp)>=0?"var(--emerald)":"var(--clay)"}}>{((tot.budget-tot.exp)>=0?"+":"")+fmt(tot.budget-tot.exp)}</td>
+              <td className="r mono" style={{color:(tot.inc-tot.exp)>=0?"var(--emerald)":"var(--clay)"}}>{fmt(tot.inc-tot.exp)}</td></tr></tfoot>
+          </table>
+        </div>
+
+        <div className="ap-card">
+          <h3 className="ap-mini-t">Top categories · {year}</h3>
+          {topCats.length ? (
+            <ul className="ap-catbars">
+              {topCats.map((t)=>(
+                <li key={t.c}>
+                  <div className="row"><span className="nm">{t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
+                  <div className="ap-track ap-track-sm"><div className="ap-fill" style={{width:(t.v/maxCat*100)+"%",background:"var(--clay)"}}/></div>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="ap-empty">Nothing spent in {year} yet.</p>}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ================= TRENDS ================= */
 function Trends({ state, archives, currentYear }) {
   const [selectedCats, setSelectedCats] = useState(["Groceries"]);
-  const [viewMode, setViewMode] = useState("bucket"); // bucket or individual
-
   const allYears = useMemo(() => {
-    const years = [];
-    const yearMap = {};
-    (archives || []).forEach((a) => {
-      if (a.year && a.state) { yearMap[a.year] = a.state; years.push(a.year); }
-    });
-    yearMap[currentYear] = state;
-    years.push(currentYear);
-    return { years: years.sort((a,b)=>a-b), yearMap };
+    const years = []; const yearMap = {};
+    (archives || []).forEach((a) => { if (a.year && a.state) { yearMap[a.year] = a.state; years.push(a.year); } });
+    yearMap[currentYear] = state; years.push(currentYear);
+    return { years: [...new Set(years)].sort((a,b)=>a-b), yearMap };
   }, [archives, state, currentYear]);
 
   const expenseCategories = state.categories.Expenses || [];
-
   const trendData = useMemo(() => {
     const result = {};
     selectedCats.forEach((cat) => {
       result[cat] = {};
       allYears.years.forEach((yr) => {
-        const yearState = allYears.yearMap[yr];
-        if (yearState) {
-          const entries = (yearState.entries || []).filter((e) => e.type === "Expenses" && e.category === cat && e.date.slice(0, 4) === String(yr));
-          const total = entries.reduce((a, e) => a + e.amount, 0);
-          result[cat][yr] = total;
-        } else {
-          result[cat][yr] = 0;
-        }
+        const ys = allYears.yearMap[yr];
+        const entries = ys ? (ys.entries || []).filter((e)=>e.type==="Expenses" && e.category===cat && e.date.slice(0,4)===String(yr)) : [];
+        result[cat][yr] = entries.reduce((a,e)=>a+e.amount,0);
       });
     });
     return result;
@@ -673,346 +844,374 @@ function Trends({ state, archives, currentYear }) {
   return (
     <section className="ap-trends">
       <div className="ap-trends-head">
-        <h2 className="ap-trends-title">Spending Trends</h2>
+        <h2 className="ap-mini-t" style={{fontSize:24,margin:"0 0 12px"}}>Spending trends</h2>
         <div className="ap-trend-opts">
           <label>Compare categories:</label>
-          <select multiple value={selectedCats} onChange={(e) => {
-            const opts = Array.from(e.target.selectedOptions, (o) => o.value);
-            setSelectedCats(opts.length > 0 ? opts : ["Groceries"]);
-          }} className="ap-multiselect">
-            {expenseCategories.map((c) => (<option key={c} value={c}>{c}</option>))}
+          <select multiple value={selectedCats} onChange={(e)=>{ const opts=Array.from(e.target.selectedOptions,(o)=>o.value); setSelectedCats(opts.length>0?opts:["Groceries"]); }} className="ap-multiselect">
+            {expenseCategories.map((c)=>(<option key={c} value={c}>{c}</option>))}
           </select>
         </div>
       </div>
 
       {allYears.years.length > 1 ? (
         <>
-          <div className="ap-trend-chart">
-            <svg viewBox={`0 0 ${50 + allYears.years.length * 80} 300`} preserveAspectRatio="xMidYMid meet">
-              {[0, 1000, 2000, 3000, 4000, 5000].map((val) => {
-                const y = 250 - (val / 5000) * 200;
-                return (
-                  <g key={`grid-${val}`}>
-                    <line x1="40" y1={y} x2={40 + allYears.years.length * 80} y2={y} stroke="var(--line)" strokeWidth="0.5" opacity="0.5" />
-                    <text x="35" y={y + 4} fontSize="10" fill="var(--ink-soft)" textAnchor="end">${Math.round(val / 100)}</text>
-                  </g>
-                );
+          <div className="ap-card" style={{marginBottom:16}}>
+            <svg viewBox={`0 0 ${50 + allYears.years.length * 80} 300`} width="100%" height="280" preserveAspectRatio="xMidYMid meet">
+              {[0,1000,2000,3000,4000,5000].map((val)=>{ const yy=250-(val/5000)*200; return (
+                <g key={`g-${val}`}>
+                  <line x1="40" y1={yy} x2={40+allYears.years.length*80} y2={yy} stroke="var(--line)" strokeWidth="0.5"/>
+                  <text x="35" y={yy+4} fontSize="10" fill="var(--ink-soft)" textAnchor="end" fontFamily="JetBrains Mono">${(val/1000)}k</text>
+                </g>); })}
+              {selectedCats.map((cat,ci)=>{
+                const points = allYears.years.map((yr,i)=>{ const v=trendData[cat]?.[yr]||0; return `${50+i*80},${250-(v/5000)*200}`; }).join(" ");
+                return (<g key={`l-${cat}`}>
+                  <polyline points={points} fill="none" stroke={colors[ci%colors.length]} strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>
+                  {allYears.years.map((yr,i)=>{ const v=trendData[cat]?.[yr]||0; return <circle key={`d-${cat}-${yr}`} cx={50+i*80} cy={250-(v/5000)*200} r="3" fill={colors[ci%colors.length]}/>; })}
+                </g>);
               })}
-
-              {selectedCats.map((cat, catIdx) => {
-                const points = allYears.years.map((yr, i) => {
-                  const val = trendData[cat]?.[yr] || 0;
-                  const x = 50 + i * 80;
-                  const y = 250 - (val / 5000) * 200;
-                  return `${x},${y}`;
-                }).join(" ");
-                return (
-                  <g key={`line-${cat}`}>
-                    <polyline points={points} fill="none" stroke={colors[catIdx % colors.length]} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                    {allYears.years.map((yr, i) => {
-                      const val = trendData[cat]?.[yr] || 0;
-                      const x = 50 + i * 80;
-                      const y = 250 - (val / 5000) * 200;
-                      return (<circle key={`dot-${cat}-${yr}`} cx={x} cy={y} r="3" fill={colors[catIdx % colors.length]} opacity="0.7" />);
-                    })}
-                  </g>
-                );
-              })}
-
-              <line x1="40" y1="250" x2={40 + allYears.years.length * 80} y2="250" stroke="var(--line)" strokeWidth="1.5" />
-              {allYears.years.map((yr, i) => {
-                const x = 50 + i * 80;
-                return (
-                  <g key={`year-${yr}`}>
-                    <line x1={x} y1="250" x2={x} y2="258" stroke="var(--line)" strokeWidth="1" />
-                    <text x={x} y="275" fontSize="12" fill="var(--ink-soft)" textAnchor="middle">{yr}</text>
-                  </g>
-                );
-              })}
+              <line x1="40" y1="250" x2={40+allYears.years.length*80} y2="250" stroke="var(--line)" strokeWidth="1.5"/>
+              {allYears.years.map((yr,i)=>(<text key={`y-${yr}`} x={50+i*80} y="275" fontSize="12" fill="var(--ink-soft)" textAnchor="middle" fontFamily="JetBrains Mono">{yr}</text>))}
             </svg>
+            <div className="ap-legend">{selectedCats.map((cat,i)=>(<span key={cat}><i style={{background:colors[i%colors.length]}}/>{cat}</span>))}</div>
           </div>
 
-          <div className="ap-trend-legend">
-            {selectedCats.map((cat, idx) => (<span key={cat}><i style={{background: colors[idx % colors.length]}} />{cat}</span>))}
-          </div>
-
-          <div className="ap-trend-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  {allYears.years.map((yr) => (<th key={yr} className="r">{yr}</th>))}
-                  {allYears.years.length > 1 && <th className="r">Change</th>}
-                  {allYears.years.length > 1 && <th className="r">% Change</th>}
-                </tr>
-              </thead>
+          <div className="ap-card">
+            <table className="ap-yeartable">
+              <thead><tr><th>Category</th>{allYears.years.map((yr)=>(<th key={yr} className="r">{yr}</th>))}<th className="r">Change</th><th className="r">%</th></tr></thead>
               <tbody>
-                {selectedCats.map((cat) => {
-                  const vals = allYears.years.map((yr) => trendData[cat]?.[yr] || 0);
-                  const lastVal = vals[vals.length - 1];
-                  const prevVal = vals[vals.length - 2] || 0;
-                  const change = lastVal - prevVal;
-                  const pctChange = prevVal > 0 ? ((change / prevVal) * 100) : 0;
-                  return (
-                    <tr key={cat}>
-                      <td className="cat-name">{cat}</td>
-                      {vals.map((v, i) => (<td key={allYears.years[i]} className="r mono">{fmt(v)}</td>))}
-                      {allYears.years.length > 1 && <td className="r mono" style={{color: change >= 0 ? "var(--clay)" : "var(--emerald)"}}>{(change >= 0 ? "+" : "")}{fmt(change)}</td>}
-                      {allYears.years.length > 1 && <td className="r mono" style={{color: pctChange >= 0 ? "var(--clay)" : "var(--emerald)"}}>{(pctChange >= 0 ? "+" : "")}{pctChange.toFixed(1)}%</td>}
-                    </tr>
-                  );
+                {selectedCats.map((cat)=>{
+                  const vals = allYears.years.map((yr)=>trendData[cat]?.[yr]||0);
+                  const last = vals[vals.length-1], prev = vals[vals.length-2]||0;
+                  const change = last-prev, pct = prev>0?((change/prev)*100):0;
+                  return (<tr key={cat}>
+                    <td className="mlbl">{cat}</td>
+                    {vals.map((v,i)=>(<td key={allYears.years[i]} className="r mono">{fmt(v)}</td>))}
+                    <td className="r mono" style={{color:change>=0?"var(--clay)":"var(--emerald)"}}>{(change>=0?"+":"")+fmt(change)}</td>
+                    <td className="r mono" style={{color:pct>=0?"var(--clay)":"var(--emerald)"}}>{(pct>=0?"+":"")+pct.toFixed(0)}%</td>
+                  </tr>);
                 })}
               </tbody>
             </table>
           </div>
         </>
       ) : (
-        <p className="ap-empty">Archive previous years to see trends. Click "End Year" in the Dashboard.</p>
+        <div className="ap-card"><p className="ap-empty">Only {currentYear} so far. At year-end, tap <b>End Year</b> on the Dashboard to archive it — then you'll see year-over-year trends here.</p></div>
       )}
     </section>
   );
 }
 
-/* ================= STYLES ================= */
+
 function Styles() {
-  return (
-    <style>{`
-:root {--paper:#EDEFF3; --paper2:#FAFBFC; --ink:#1B2230; --ink-soft:#5E6675; --line:#D5DAE2; --emerald:#1C6B4B; --teal:#2A7E7B; --clay:#B23A2E; --navy:#23456E;}
-* {margin:0;padding:0;box-sizing:border-box;}
-body {background:var(--paper);color:var(--ink);font-family:'Archivo',-apple-system,sans-serif;line-height:1.5;}
-input, select, button, textarea {font-family:inherit;font-size:inherit;}
+  return (<style>{`
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  :root{--paper:#EDEFF3;--paper2:#FAFBFC;--ink:#1B2230;--ink-soft:#5E6675;
+    --line:#D5DAE2;--emerald:#1C6B4B;--teal:#2A7E7B;--clay:#B23A2E;--navy:#23456E;}
+  *{box-sizing:border-box;}
+  .ap-root{min-height:100vh;background:
+    radial-gradient(120% 80% at 12% -10%, #F4F6F9 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 0%, #DEE4EE 0%, transparent 50%), var(--paper);
+    color:var(--ink);font-family:'Archivo',sans-serif;-webkit-font-smoothing:antialiased;}
+  .ap-wrap{max-width:1060px;margin:0 auto;padding:30px 20px 60px;}
+  .mono{font-family:'JetBrains Mono';font-variant-numeric:tabular-nums;}
+  .dim{color:var(--ink-soft);opacity:.85;}
+  .ap-loading{text-align:center;color:var(--ink-soft);padding:40px 0;}
 
-.ap-root {min-height:100vh;background:var(--paper2);}
-.ap-header {background:var(--paper2);border-bottom:1.5px solid var(--line);padding:16px 20px;position:sticky;top:0;z-index:100;}
-.ap-header-main {max-width:1000px;margin:0 auto;}
-.ap-title {font-family:'Fraunces',serif;font-size:28px;font-weight:500;margin:0;color:var(--ink);}
-.ap-heart {font-size:20px;}
-.ap-kicker {font-size:11px;color:var(--ink-soft);letter-spacing:.08em;margin:4px 0 0;text-transform:uppercase;display:flex;gap:8px;align-items:center;}
-.ap-signout {background:none;border:none;color:var(--navy);font-weight:600;cursor:pointer;text-decoration:underline;font-size:11px;}
+  .ap-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
+    border-bottom:1.5px solid var(--line);padding-bottom:16px;margin-bottom:18px;}
+  .ap-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);font-weight:700;}
+  .ap-user{color:var(--ink-soft);font-weight:600;}
+  .ap-signout{background:none;border:none;color:var(--ink-soft);font-family:'JetBrains Mono';font-size:10px;text-decoration:underline;cursor:pointer;padding:0;text-transform:none;letter-spacing:0;}
+  .ap-title{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(28px,5vw,44px);line-height:1;margin:5px 0 0;letter-spacing:-.01em;}
+  .ap-title .ap-heart{color:var(--navy);font-size:.5em;vertical-align:.35em;margin:0 .12em;}
+  .ap-title .ap-bill{font-size:.62em;vertical-align:.12em;}
+  .ap-periodbox{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .ap-saved{font-size:11px;color:var(--emerald);font-family:'JetBrains Mono';font-weight:600;}
+  .ap-period{display:flex;align-items:center;gap:6px;background:var(--paper2);border:1.5px solid var(--line);border-radius:11px;padding:4px;}
+  .ap-period select,.ap-year{font-family:'Archivo';font-weight:600;font-size:14px;color:var(--ink);background:transparent;border:none;outline:none;padding:6px 8px;border-radius:7px;}
+  .ap-year{width:74px;text-align:center;}
+  .ap-arrow{border:none;background:var(--paper);color:var(--ink);font-size:18px;line-height:1;width:30px;height:30px;border-radius:7px;cursor:pointer;}
+  .ap-arrow:hover{background:var(--ink);color:var(--paper2);}
+  .ap-todaybtn{font-family:'Archivo';font-weight:600;font-size:12px;background:var(--paper);border:1.5px solid var(--line);
+    border-radius:7px;padding:6px 11px;cursor:pointer;color:var(--ink-soft);margin-left:2px;}
+  .ap-todaybtn:hover{border-color:var(--navy);color:var(--ink);}
 
-.ap-container {max-width:1000px;margin:0 auto;padding:20px;}
-.ap-month-bar {display:flex;gap:10px;align-items:center;margin-bottom:20px;padding:10px;background:var(--paper2);border-radius:8px;}
-.ap-nav {background:none;border:none;font-size:16px;cursor:pointer;color:var(--ink);font-weight:600;}
-.ap-month {font-weight:600;min-width:60px;color:var(--ink);}
-.ap-chevron {font-size:12px;opacity:0.6;}
-.ap-year-input {background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:6px 10px;width:70px;text-align:center;font-weight:600;outline:none;}
-.ap-today {background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:600;color:var(--ink-soft);}
+  .ap-tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1.5px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .ap-tabs button{font-family:'Archivo';font-weight:600;font-size:14px;background:none;border:none;cursor:pointer;
+    color:var(--ink-soft);padding:10px 16px;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;white-space:nowrap;flex-shrink:0;}
+  .ap-tabs button.on{color:var(--ink);border-color:var(--navy);}
 
-.ap-tabs {display:flex;gap:4px;margin-bottom:18px;border-bottom:1.5px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.ap-tabs button {font-family:'Archivo';font-weight:600;font-size:14px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:10px 16px;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;white-space:nowrap;flex-shrink:0;}
-.ap-tabs button.on {color:var(--ink);border-color:var(--navy);}
+  .ap-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+  .ap-stat{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:13px 15px;display:flex;flex-direction:column;gap:7px;}
+  .ap-stat .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  .ap-stat .val{font-family:'Fraunces',serif;font-weight:500;font-size:26px;line-height:1;font-variant-numeric:tabular-nums;}
+  .ap-stat.hero{background:var(--ink);border-color:var(--ink);}
+  .ap-stat.hero .lbl{color:#AEB6C4;}.ap-stat.hero .val{color:var(--paper2);}
 
-.ap-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
-.ap-stat {background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:16px;text-align:center;}
-.ap-stat.hero {background:var(--navy);border:none;color:var(--paper2);}
-.ap-stat-label {font-size:11px;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:8px;}
-.ap-stat.hero .ap-stat-label {color:var(--paper);}
-.ap-stat-val {font-family:'JetBrains Mono';font-size:22px;display:block;color:var(--stat-color,var(--ink));}
-.ap-stat.hero .ap-stat-val {color:var(--paper2);}
+  .ap-overall{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:14px 16px;margin-bottom:16px;}
+  .ap-overall-top{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);margin-bottom:9px;font-weight:500;}
+  .ap-note{font-size:12px;color:var(--ink-soft);margin-top:9px;font-family:'JetBrains Mono';}
+  .ap-note b{color:var(--teal);}
+  .ap-track{width:100%;height:8px;background:var(--line);border-radius:5px;overflow:hidden;}
+  .ap-track-lg{height:12px;}.ap-track-sm{height:6px;}
+  .ap-fill{height:100%;border-radius:5px;transition:width .3s ease;}
+  .ap-endyear{font-family:'Archivo';font-weight:600;font-size:12px;background:none;color:var(--clay);border:1.5px solid var(--line);border-radius:8px;padding:7px 14px;cursor:pointer;margin-top:12px;}
+  .ap-endyear:hover{border-color:var(--clay);background:#FBEEEB;}
 
-.ap-overall {background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:20px;margin-bottom:20px;}
-.ap-overall-top {display:flex;justify-content:space-between;font-size:13px;margin-bottom:12px;font-weight:600;}
-.ap-track {background:var(--paper);border-radius:8px;height:12px;overflow:hidden;margin-bottom:12px;}
-.ap-track-lg {height:20px;}
-.ap-fill {background:var(--emerald);height:100%;transition:width 0.3s;}
-.ap-note {font-size:12px;color:var(--ink-soft);margin-bottom:12px;}
-.ap-end-year-btn {font-family:'Archivo';font-weight:600;font-size:12px;background:var(--clay);color:var(--paper2);border:none;border-radius:8px;padding:10px 16px;cursor:pointer;margin-top:12px;}
-.ap-end-year-btn:hover {background:var(--navy);}
+  .ap-addbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--paper2);
+    border:1.5px solid var(--line);border-radius:13px;padding:11px 13px;margin-bottom:18px;}
+  .ap-add-lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;}
+  .ap-addbar select,.ap-addbar input{font-family:'Archivo';font-size:14px;color:var(--ink);background:var(--paper);
+    border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;outline:none;}
+  .ap-addbar select:focus,.ap-addbar input:focus{border-color:var(--navy);}
+  .ap-addbar .wide{min-width:150px;}.ap-addbar .amt{width:96px;}.ap-addbar .note{flex:1;min-width:120px;}
+  .ap-addbtn{font-family:'Archivo';font-weight:700;font-size:14px;background:var(--ink);color:var(--paper2);
+    border:none;border-radius:8px;padding:9px 22px;cursor:pointer;}
+  .ap-addbtn:hover{background:var(--emerald);}
 
-.ap-envelopes {margin-bottom:20px;}
-.ap-envelopes h3 {font-family:'Fraunces',serif;font-size:18px;font-weight:500;margin-bottom:12px;}
-.ap-envelope {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;}
-.ap-env-label {display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;}
-.ap-cat-name {font-weight:600;}
-.ap-cat-amounts {font-family:'JetBrains Mono';color:var(--ink-soft);}
+  .ap-env-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px;}
+  .ap-env{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:14px 15px;}
+  .ap-env.over{border-color:var(--clay);background:#FBEEEB;}
+  .ap-env-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px;}
+  .ap-env-name{font-weight:600;font-size:14px;}
+  .ap-cnt{font-style:normal;font-family:'JetBrains Mono';font-size:10px;background:var(--line);color:var(--ink-soft);border-radius:10px;padding:1px 6px;margin-left:6px;}
+  .ap-env-rem{font-size:12px;font-weight:600;white-space:nowrap;}
+  .ap-env-foot{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:12px;}
+  .ap-envadd{font-family:'Archivo';font-weight:600;font-size:11.5px;background:none;border:1.5px solid var(--line);
+    border-radius:7px;padding:4px 10px;cursor:pointer;color:var(--ink-soft);}
+  .ap-envadd:hover{border-color:var(--emerald);color:var(--emerald);}
+  .ap-envform{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+  .ap-envform .cur{font-family:'JetBrains Mono';font-size:13px;color:var(--ink-soft);}
+  .ap-envform input{font-family:'Archivo';font-size:13px;border:1.5px solid var(--line);border-radius:7px;padding:6px 8px;background:var(--paper);outline:none;}
+  .ap-envform input:focus{border-color:var(--navy);}
+  .ap-envform .amt{width:74px;font-family:'JetBrains Mono';text-align:right;}
+  .ap-envform .note{flex:1;min-width:0;}
+  .ap-envgo{font-family:'Archivo';font-weight:700;font-size:12px;background:var(--ink);color:var(--paper2);border:none;border-radius:7px;padding:7px 12px;cursor:pointer;}
+  .ap-envgo:hover{background:var(--emerald);}
+  .ap-env-items{list-style:none;margin:11px 0 0;padding:11px 0 0;border-top:1px solid var(--line);}
+  .ap-env-items li{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;}
+  .ap-env-items .d{font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);width:18px;}
+  .ap-env-items .n{flex:1;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-env-items .x{border:none;background:none;color:var(--ink-soft);cursor:pointer;font-size:16px;padding:0 2px;}
+  .ap-env-items .x:hover{color:var(--clay);}
 
-.ap-entry-form {display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;}
-.ap-date-input, .ap-type-select, .ap-cat-select, .ap-name-input, .ap-amount-input, .ap-bucket-select {background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:10px;font-size:13px;outline:none;}
-.ap-date-input:focus, .ap-type-select:focus, .ap-cat-select:focus, .ap-name-input:focus, .ap-amount-input:focus, .ap-bucket-select:focus {border-color:var(--navy);}
-.ap-btn-add {font-family:'Archivo';font-weight:600;background:var(--navy);color:var(--paper2);border:none;border-radius:8px;padding:10px 16px;cursor:pointer;}
-.ap-btn-add:hover {background:var(--emerald);}
+  .ap-mini{margin-bottom:16px;}
+  .ap-mini-t{font-family:'Fraunces',serif;font-weight:500;font-size:18px;margin:0 0 10px;}
+  .ap-mini-rows{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:6px 16px;}
+  .ap-mini-row{display:grid;grid-template-columns:160px 1fr 150px;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .ap-mini-row:last-child{border-bottom:none;}
+  .ap-mini-row .nm{font-weight:500;font-size:13.5px;}.ap-mini-row .vl{text-align:right;font-size:12.5px;}
 
-.ap-plan {max-width:100%;}
-.ap-plan-bar {display:flex;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
-.ap-alloc {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;min-width:140px;}
-.ap-alloc span {font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;}
-.ap-alloc b {font-family:'JetBrains Mono';font-size:18px;margin-top:4px;}
-.ap-alloc.ok {border-color:var(--emerald);}
-.ap-alloc.neg {border-color:var(--clay);}
-.ap-plan-actions {display:flex;gap:12px;flex-wrap:wrap;}
-.ap-copyfrom {display:flex;gap:6px;align-items:center;font-size:12px;}
-.ap-copyfrom select, .ap-copyfrom input, .ap-copyfrom button {padding:6px 8px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);font-size:12px;}
-.ap-plan-hint {font-size:12px;color:var(--ink-soft);margin-bottom:16px;}
+  .ap-plan-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+  .ap-alloc{display:flex;align-items:center;gap:10px;background:var(--paper2);border:1.5px solid var(--line);border-radius:11px;padding:10px 16px;}
+  .ap-alloc span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  .ap-alloc b{font-family:'Fraunces',serif;font-size:22px;font-weight:500;}
+  .ap-alloc.ok{border-color:var(--emerald);}.ap-alloc.ok b{color:var(--emerald);}
+  .ap-alloc.neg{border-color:var(--clay);}.ap-alloc.neg b{color:var(--clay);}
+  .ap-plan-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .ap-plan-actions button{font-family:'Archivo';font-weight:600;font-size:13px;background:var(--ink);color:var(--paper2);border:none;border-radius:9px;padding:9px 14px;cursor:pointer;}
+  .ap-plan-actions button.ghost{background:none;color:var(--ink-soft);border:1.5px solid var(--line);}
+  .ap-plan-actions button.ghost:hover{border-color:var(--clay);color:var(--clay);}
+  .ap-copyfrom{display:flex;align-items:center;gap:6px;background:var(--paper2);border:1.5px solid var(--line);border-radius:9px;padding:4px 4px 4px 12px;}
+  .ap-copyfrom>span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  .ap-copyfrom select,.ap-copyfrom input{font-family:'Archivo';font-size:13px;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:6px 8px;outline:none;}
+  .ap-copyfrom select:focus,.ap-copyfrom input:focus{border-color:var(--navy);}
+  .ap-copyfrom .src-year{width:64px;text-align:center;}
+  .ap-copyfrom button{font-family:'Archivo';font-weight:700;font-size:13px;background:var(--ink);color:var(--paper2);border:none;border-radius:7px;padding:7px 14px;cursor:pointer;}
+  .ap-copyfrom button:hover{background:var(--emerald);}
+  .ap-plan-hint{font-size:13px;color:var(--ink-soft);margin:0 0 18px;}
+  .ap-plansec{background:var(--paper2);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px;}
+  .ap-plansec-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid var(--line);padding-bottom:8px;margin-bottom:6px;}
+  .ap-plansec-head h3{font-family:'Fraunces',serif;font-weight:500;font-size:18px;margin:0;}
+  .ap-plansec-head .total{font-size:14px;font-weight:600;}
+  .ap-planrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);}
+  .ap-planrow:last-child{border-bottom:none;}
+  .ap-planrow-name{flex:1;font-size:14px;font-weight:500;cursor:pointer;border-bottom:1px dashed transparent;}
+  .ap-planrow-name:hover{border-bottom-color:var(--ink-soft);}
+  .ap-renamein{flex:1;font-family:'Archivo';font-size:14px;padding:6px 8px;border:1.5px solid var(--navy);border-radius:7px;background:var(--paper);outline:none;}
+  .ap-amtwrap{display:flex;align-items:center;background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:0 4px 0 9px;}
+  .ap-amtwrap:focus-within{border-color:var(--navy);}
+  .ap-amtwrap .cur{color:var(--ink-soft);font-size:13px;font-family:'JetBrains Mono';}
+  .ap-amtwrap input{width:92px;border:none;background:transparent;outline:none;font-family:'JetBrains Mono';font-size:13.5px;text-align:right;padding:8px 6px;color:var(--ink);}
+  .ap-del{border:none;background:none;color:var(--ink-soft);font-size:17px;cursor:pointer;padding:0 4px;}
+  .ap-del:hover{color:var(--clay);}
+  .ap-addcat{display:flex;gap:8px;margin-top:10px;}
+  .ap-addcat input{flex:1;font-family:'Archivo';font-size:13.5px;background:var(--paper);border:1.5px dashed var(--line);border-radius:8px;padding:8px 11px;outline:none;}
+  .ap-addcat input:focus{border-style:solid;border-color:var(--navy);}
+  .ap-addcat button{font-family:'Archivo';font-weight:600;font-size:13px;background:none;border:1.5px solid var(--line);border-radius:8px;padding:0 16px;cursor:pointer;color:var(--ink);}
+  .ap-addcat button:hover{border-color:var(--emerald);color:var(--emerald);}
+  .ap-empty{color:var(--ink-soft);font-size:13px;text-align:center;padding:14px 0;}
 
-.ap-buckets-manager {background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:16px;margin-bottom:20px;}
-.ap-buckets-manager h3 {font-family:'Fraunces',serif;font-weight:500;font-size:18px;margin:0 0 8px;}
-.ap-buckets-hint {font-size:12px;color:var(--ink-soft);margin:0 0 12px;}
-.ap-buckets-list {display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
-.ap-bucket-item {display:grid;grid-template-columns:1fr 80px 70px;gap:8px;align-items:center;padding:8px;background:var(--paper);border-radius:6px;}
-.ap-bucket-name {background:transparent;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-weight:600;outline:none;}
-.ap-bucket-count {font-size:11px;color:var(--ink-soft);}
-.ap-bucket-delete {background:var(--clay);color:var(--paper2);border:none;border-radius:4px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;}
-.ap-add-bucket {display:flex;gap:8px;}
-.ap-bucket-input {flex:1;background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:8px;font-size:12px;outline:none;}
-.ap-add-bucket button {background:var(--navy);color:var(--paper2);border:none;border-radius:6px;padding:8px 12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .ap-card{background:var(--paper2);border:1.5px solid var(--line);border-radius:16px;padding:18px;}
+  .ap-filtbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .ap-filtbar input,.ap-filtbar select{font-family:'Archivo';font-size:14px;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px 11px;outline:none;}
+  .ap-search{flex:1;min-width:180px;}
+  .ap-count{font-size:13px;color:var(--ink-soft);font-family:'JetBrains Mono';margin-left:auto;}
+  .ap-txnscroll{max-height:540px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .ap-txntable{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .ap-txntable th{position:sticky;top:0;background:var(--paper2);text-align:left;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;padding:9px 10px;border-bottom:1.5px solid var(--line);z-index:1;}
+  .ap-txntable td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  .ap-txntable .r{text-align:right;}.ap-txntable .mono{font-family:'JetBrains Mono';font-size:12.5px;font-variant-numeric:tabular-nums;}
+  .ap-txntable .cat{font-weight:500;}.ap-txntable .det{color:var(--ink-soft);}.ap-txntable .nowrap{white-space:nowrap;}
+  .ap-txntable.editing td,.ap-txntable tr.editing td{background:#EDF1F7;}
+  .ap-txntable input,.ap-txntable select{font-family:'Archivo';font-size:13px;border:1.5px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--paper);outline:none;width:100%;}
+  .ap-txntable input.amt{width:90px;text-align:right;font-family:'JetBrains Mono';}
+  .bchip{font-size:10.5px;font-weight:700;background:var(--navy);color:var(--paper2);padding:3px 8px;border-radius:20px;white-space:nowrap;}
+  .bsel{font-family:'Archivo';font-size:11px;border:1.5px dashed var(--line);border-radius:6px;padding:3px 5px;background:var(--paper);color:var(--ink-soft);outline:none;}
+  .rowacts{white-space:nowrap;text-align:right;}
+  .ap-rowbtn{font-family:'Archivo';font-weight:600;font-size:12px;background:none;border:1.5px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer;color:var(--ink-soft);margin-left:5px;}
+  .ap-rowbtn:hover{border-color:var(--ink);color:var(--ink);}
+  .ap-rowbtn.del:hover{border-color:var(--clay);color:var(--clay);}
+  .ap-rowbtn.done{background:var(--emerald);color:var(--paper2);border-color:var(--emerald);}
+  .chip{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+  .chip-income{background:#E1EFE6;color:var(--emerald);}.chip-expenses{background:#F4E3DF;color:var(--clay);}.chip-savings{background:#DFEDEC;color:var(--teal);}
 
-.ap-plansec {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden;}
-.ap-plansec-head {padding:12px 16px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
-.ap-emerald {background:rgba(28,107,75,0.1);}
-.ap-teal {background:rgba(42,126,123,0.1);}
-.ap-clay {background:rgba(178,58,46,0.1);}
-.ap-plansec-cats {padding:12px 16px;border-top:1.5px solid var(--line);}
-.ap-plancat {display:grid;grid-template-columns:1fr 100px 40px;gap:10px;align-items:center;margin-bottom:8px;}
-.ap-plancat:last-child {margin-bottom:0;}
-.ap-catname {background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:8px;font-size:13px;outline:none;font-weight:500;}
-.ap-catamt {background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:8px;font-family:'JetBrains Mono';font-size:13px;text-align:right;outline:none;}
-.ap-del {background:var(--line);border:none;border-radius:4px;cursor:pointer;color:var(--clay);font-weight:600;}
-.ap-addcat {padding:12px 16px;border-top:1.5px solid var(--line);display:flex;gap:8px;}
-.ap-addcat input {flex:1;background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:8px;font-size:13px;outline:none;}
-.ap-addcat button {background:var(--navy);color:var(--paper2);border:none;border-radius:6px;padding:8px 12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .ap-foot{margin-top:26px;text-align:center;font-size:12px;color:var(--ink-soft);font-family:'JetBrains Mono';}
 
-.ap-txns {max-width:100%;}
-.ap-txns h3 {font-family:'Fraunces',serif;font-size:18px;font-weight:500;margin-bottom:12px;}
-.ap-filter-cat {background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:8px;margin-bottom:12px;outline:none;}
-.ap-txns-list {display:flex;flex-direction:column;gap:8px;}
-.ap-txn-row {background:var(--paper2);border:1.5px solid var(--line);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;}
-.ap-txn-info {display:flex;gap:10px;flex:1;align-items:center;font-size:12px;}
-.ap-txn-name {font-weight:600;color:var(--ink);}
-.ap-txn-cat {background:var(--paper);padding:2px 8px;border-radius:4px;font-size:10px;color:var(--ink-soft);}
-.ap-txn-bucket {background:var(--navy);color:var(--paper2);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;}
-.ap-txn-date {color:var(--ink-soft);font-size:11px;}
-.ap-txn-actions {display:flex;gap:8px;align-items:center;}
-.ap-txn-amt {font-family:'JetBrains Mono';font-weight:600;min-width:80px;text-align:right;}
-.ap-txn-bucket-select {background:var(--paper);border:1.5px solid var(--line);border-radius:4px;padding:4px;font-size:11px;outline:none;}
+  .ap-legend{display:flex;gap:18px;margin-top:8px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap;}
+  .ap-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+  .ap-yeargrid{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;}
+  .ap-yeartable{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .ap-yeartable th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;padding:7px 9px;border-bottom:1.5px solid var(--line);}
+  .ap-yeartable td{padding:8px 9px;border-bottom:1px solid var(--line);}
+  .ap-yeartable .r{text-align:right;}
+  .ap-yeartable .mono{font-family:'JetBrains Mono';font-size:12px;font-variant-numeric:tabular-nums;}
+  .ap-yeartable .mlbl{font-weight:600;}
+  .ap-yeartable tbody tr{cursor:pointer;}
+  .ap-yeartable tbody tr:hover td{background:#EDF1F7;}
+  .ap-yeartable tfoot td{padding:9px;border-top:1.5px solid var(--line);font-weight:700;font-size:12px;}
+  .ap-yeartable tfoot .mono{font-weight:700;}
+  .ap-catbars{list-style:none;margin:0;padding:0;}
+  .ap-catbars li{padding:7px 0;border-bottom:1px solid var(--line);}
+  .ap-catbars li:last-child{border-bottom:none;}
+  .ap-catbars .row{display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px;}
+  .ap-catbars .nm{font-weight:500;}.ap-catbars .vl{font-size:12px;}
 
-.ap-year {max-width:100%;}
-.ap-year h3 {font-family:'Fraunces',serif;font-size:18px;font-weight:500;margin-bottom:16px;}
-.ap-year-chart {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;overflow-x:auto;}
-.ap-year-chart svg {width:100%;height:auto;min-height:300px;}
-.ap-year-table {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;}
-.ap-year-table table {width:100%;border-collapse:collapse;font-size:13px;}
-.ap-year-table th {text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:600;padding:10px;border-bottom:1.5px solid var(--line);}
-.ap-year-table td {padding:10px;border-bottom:1px solid var(--line);}
-.ap-year-table .r {text-align:right;}
-.ap-year-table .mono {font-family:'JetBrains Mono';}
+  .ap-iobtn{font-family:'Archivo';font-weight:600;font-size:13px;background:none;border:1.5px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;color:var(--ink);}
+  .ap-iobtn:hover{border-color:var(--navy);}
+  .ap-importmsg{font-size:12.5px;color:var(--emerald);font-family:'JetBrains Mono';margin-bottom:12px;background:#E7F1EA;border:1px solid #BFD9C9;border-radius:8px;padding:8px 12px;}
 
-.ap-trends {max-width:100%;}
-.ap-trends-head {margin-bottom:20px;}
-.ap-trends-title {font-family:'Fraunces',serif;font-weight:500;font-size:24px;margin:0 0 12px;}
-.ap-trend-opts {display:flex;align-items:center;gap:10px;}
-.ap-trend-opts label {font-size:13px;color:var(--ink-soft);font-weight:600;}
-.ap-multiselect {font-family:'Archivo';font-size:13px;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px;outline:none;min-width:200px;max-height:100px;}
-.ap-trend-chart {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;overflow-x:auto;}
-.ap-trend-chart svg {width:100%;height:auto;min-height:300px;}
-.ap-trend-legend {display:flex;gap:18px;margin-bottom:16px;font-size:12px;color:var(--ink-soft);}
-.ap-trend-legend i {display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px;}
-.ap-trend-table {background:var(--paper2);border:1.5px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;}
-.ap-trend-table table {width:100%;border-collapse:collapse;font-size:13px;}
-.ap-trend-table th {text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:600;padding:10px;border-bottom:1.5px solid var(--line);}
-.ap-trend-table td {padding:10px;border-bottom:1px solid var(--line);}
-.ap-trend-table .r {text-align:right;}
-.ap-trend-table .mono {font-family:'JetBrains Mono';font-variant-numeric:tabular-nums;}
+  .ap-trend-opts{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .ap-trend-opts label{font-size:13px;color:var(--ink-soft);font-weight:600;}
+  .ap-multiselect{font-family:'Archivo';font-size:13px;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:8px;outline:none;min-width:200px;max-height:120px;}
+  .ap-trends-head{margin-bottom:16px;}
 
-.ap-modal-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;}
-.ap-modal {background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:24px;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,0.15);}
-.ap-modal h3 {font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin:0 0 12px;color:var(--ink);}
-.ap-modal p {font-size:14px;color:var(--ink-soft);line-height:1.5;margin:0 0 16px;}
-.ap-modal b {color:var(--clay);font-weight:600;}
-.ap-modal-actions {display:flex;gap:10px;flex-direction:column;}
-.ap-btn-primary {font-family:'Archivo';font-weight:600;font-size:13px;background:var(--navy);color:var(--paper2);border:none;border-radius:8px;padding:11px 16px;cursor:pointer;}
-.ap-btn-primary:hover {background:var(--emerald);}
-.ap-btn-secondary {font-family:'Archivo';font-weight:600;font-size:13px;background:var(--paper);color:var(--ink);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;}
-.ap-btn-secondary:hover {background:var(--line);}
+  .ap-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+  .ap-modal{background:var(--paper2);border:1.5px solid var(--line);border-radius:14px;padding:24px;max-width:340px;box-shadow:0 18px 50px -20px rgba(0,0,0,0.4);}
+  .ap-modal h3{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin:0 0 10px;}
+  .ap-modal p{font-size:14px;color:var(--ink-soft);margin:0 0 16px;}
+  .ap-modal b{color:var(--clay);}
+  .ap-modal-actions{display:flex;flex-direction:column;gap:9px;}
+  .ap-modal-primary{font-family:'Archivo';font-weight:700;font-size:14px;background:var(--navy);color:var(--paper2);border:none;border-radius:9px;padding:11px;cursor:pointer;}
+  .ap-modal-secondary{font-family:'Archivo';font-weight:600;font-size:13px;background:none;color:var(--ink);border:1.5px solid var(--line);border-radius:9px;padding:10px;cursor:pointer;}
 
-.ap-empty {text-align:center;color:var(--ink-soft);padding:20px;font-size:13px;}
-.ap-loading {text-align:center;padding:40px;color:var(--ink-soft);}
-.ap-foot {margin-top:26px;text-align:center;font-size:12px;color:var(--ink-soft);font-family:'JetBrains Mono';}
+  /* login */
+  .ap-auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:
+    radial-gradient(120% 80% at 12% -10%, #F4F6F9 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 0%, #DEE4EE 0%, transparent 50%), var(--paper);font-family:'Archivo',sans-serif;}
+  .ap-auth{background:var(--paper2);border:1px solid var(--line);border-radius:18px;padding:34px 30px;width:100%;max-width:380px;box-shadow:0 18px 50px -28px rgba(27,34,48,.55);}
+  .ap-auth-k{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--navy);font-weight:600;}
+  .ap-auth h1{font-family:'Fraunces',serif;font-weight:500;font-size:30px;margin:6px 0 2px;color:var(--ink);line-height:1;}
+  .ap-auth h1 .ap-heart{color:var(--navy);font-size:.55em;vertical-align:.25em;margin:0 .1em;}
+  .ap-auth .sub{color:var(--ink-soft);font-size:13.5px;margin:8px 0 22px;}
+  .ap-auth label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 0 5px;}
+  .ap-auth input{width:100%;font-family:'Archivo';font-size:15px;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;margin-bottom:15px;color:var(--ink);background:#fff;box-sizing:border-box;}
+  .ap-auth input:focus{outline:none;border-color:var(--navy);}
+  .ap-auth .go{width:100%;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:12px;font-family:'Archivo';font-weight:700;font-size:15px;cursor:pointer;}
+  .ap-auth .go:disabled{opacity:.6;cursor:default;}
+  .ap-auth .toggle{margin-top:16px;text-align:center;font-size:13px;color:var(--ink-soft);}
+  .ap-auth .toggle button{background:none;border:none;color:var(--navy);font-weight:700;cursor:pointer;font-size:13px;font-family:'Archivo';}
+  .ap-auth .err{background:#FBEAE8;border:1px solid #E4B9B3;color:var(--clay);font-size:13px;border-radius:9px;padding:9px 12px;margin-bottom:14px;}
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-    `}</style>
-  );
+  @media(max-width:820px){.ap-env-grid{grid-template-columns:repeat(2,1fr);}.ap-yeargrid{grid-template-columns:1fr;}}
+  @media(max-width:600px){
+    .ap-summary{grid-template-columns:repeat(2,1fr);}
+    .ap-env-grid{grid-template-columns:1fr;}
+    .ap-addbar .note{order:9;width:100%;}
+    .ap-mini-row{grid-template-columns:1fr 90px;grid-template-areas:"nm vl" "bar bar";}
+    .ap-mini-row .nm{grid-area:nm;}.ap-mini-row .vl{grid-area:vl;}.ap-mini-row .ap-track{grid-area:bar;}
+    .ap-count{margin-left:0;width:100%;}
+  }
+  `}</style>);
 }
 
 
-/* ---- Auth Gate & Root ---- */
+/* ================= AUTH ================= */
+function AuthScreen() {
+  const [mode, setMode] = useState("signin");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr("");
+    if (!email || !pw) { setErr("Enter your email and password."); return; }
+    if (mode==="signup" && pw.length<6) { setErr("Password must be at least 6 characters."); return; }
+    setBusy(true);
+    try {
+      if (mode==="signup") {
+        const { error } = await sb.auth.signUp({ email: email.trim(), password: pw });
+        if (error) throw error;
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password: pw });
+        if (error) throw error;
+      }
+    } catch (e) { setErr((e && e.message) || "Something went wrong."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <>
+      <Styles/>
+      <div className="ap-auth-wrap">
+        <div className="ap-auth">
+          <div className="ap-auth-k">Family Budget</div>
+          <h1>Ramirez Rojas <span className="ap-heart">♥</span> 💵</h1>
+          <p className="sub">{mode==="signup" ? "Create your account to start budgeting together." : "Sign in to your family budget."}</p>
+          {err && <div className="err">{err}</div>}
+          <label>Email</label>
+          <input type="email" placeholder="you@email.com" value={email} autoComplete="email"
+            onChange={(e)=>setEmail(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          <label>Password</label>
+          <input type="password" placeholder="••••••••" value={pw} autoComplete={mode==="signup"?"new-password":"current-password"}
+            onChange={(e)=>setPw(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          <button className="go" onClick={submit} disabled={busy}>{busy ? "Please wait…" : (mode==="signup"?"Create account":"Sign in")}</button>
+          <div className="toggle">
+            {mode==="signup" ? "Already have an account? " : "New here? "}
+            <button onClick={()=>{ setMode(mode==="signup"?"signin":"signup"); setErr(""); }}>{mode==="signup"?"Sign in":"Create one"}</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function Root() {
-  const [session, setSession] = React.useState(null);
-  const [checked, setChecked] = React.useState(false);
-
-  React.useEffect(() => {
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => setSession(session));
-      setChecked(true);
-      return () => subscription.unsubscribe();
-    })();
+  const [session, setSession] = useState(undefined);
+  useEffect(() => {
+    sb.auth.getSession().then(({ data }) => setSession(data.session || null));
+    const { data: sub } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => { try { sub.subscription.unsubscribe(); } catch (e) {} };
   }, []);
-
-  if (!checked) return <div style={{textAlign:"center", padding:"40px", color:"#5E6675"}}>Loading...</div>;
-
-  if (!session) {
-    return <AuthScreen supabase={supabase} />;
-  }
-
-  const email = session.user.email.toLowerCase();
+  if (session === undefined) return <div className="ap-root"><Styles/><p className="ap-loading">Loading…</p></div>;
+  if (!session) return <AuthScreen/>;
+  const email = (session.user.email||"").toLowerCase();
   if (!ALLOWED.includes(email)) {
     return (
-      <div style={{padding:"40px", textAlign:"center", color:"#1B2230", fontFamily:"Archivo,-apple-system,sans-serif"}}>
-        <p style={{fontSize:"18px", fontWeight:"600", marginBottom:"12px"}}>Access Restricted</p>
-        <p style={{color:"#5E6675", marginBottom:"24px"}}>This account isn't authorized.</p>
-        <button onClick={() => supabase.auth.signOut()} style={{background:"#B23A2E", color:"white", border:"none", padding:"10px 20px", borderRadius:"8px", cursor:"pointer", fontWeight:"600"}}>Sign Out</button>
-      </div>
+      <>
+        <Styles/>
+        <div className="ap-auth-wrap"><div className="ap-auth" style={{textAlign:"center"}}>
+          <h1 style={{fontSize:24}}>Access restricted</h1>
+          <p className="sub">This account isn't authorized for the Ramirez Rojas budget.</p>
+          <button className="go" onClick={()=>sb.auth.signOut()}>Sign out</button>
+        </div></div>
+      </>
     );
   }
-
-  return <App supabase={supabase} session={session} onSignOut={() => supabase.auth.signOut()} />;
-}
-
-function AuthScreen({ supabase }) {
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [isSignUp, setIsSignUp] = React.useState(false);
-  const [error, setError] = React.useState("");
-
-  const handleAuth = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      if (isSignUp) {
-        const { error: e } = await supabase.auth.signUp({ email, password });
-        if (e) setError(e.message);
-      } else {
-        const { error: e } = await supabase.auth.signInWithPassword({ email, password });
-        if (e) setError(e.message);
-      }
-    } catch (e) {
-      setError(e.message);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div style={{minHeight:"100vh", background:"#EDEFF3", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Archivo,-apple-system,sans-serif"}}>
-      <div style={{background:"#FAFBFC", border:"1.5px solid #D5DAE2", borderRadius:"13px", padding:"40px", maxWidth:"360px", width:"90%"}}>
-        <h2 style={{fontFamily:"Fraunces,serif", fontSize:"24px", marginBottom:"8px"}}>Ramirez Rojas ♥ 💵</h2>
-        <p style={{color:"#5E6675", marginBottom:"24px", fontSize:"13px"}}>Family Budget</p>
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{width:"100%", padding:"10px", marginBottom:"12px", border:"1.5px solid #D5DAE2", borderRadius:"8px", fontFamily:"inherit", boxSizing:"border-box"}} />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{width:"100%", padding:"10px", marginBottom:"16px", border:"1.5px solid #D5DAE2", borderRadius:"8px", fontFamily:"inherit", boxSizing:"border-box"}} />
-        {error && <p style={{color:"#B23A2E", fontSize:"12px", marginBottom:"12px"}}>{error}</p>}
-        <button onClick={handleAuth} disabled={loading} style={{width:"100%", padding:"12px", background:"#23456E", color:"white", border:"none", borderRadius:"8px", fontWeight:"600", cursor:"pointer", marginBottom:"12px"}}>
-          {loading ? "..." : (isSignUp ? "Sign Up" : "Log In")}
-        </button>
-        <button onClick={() => setIsSignUp(!isSignUp)} style={{width:"100%", padding:"12px", background:"none", color:"#23456E", border:"1.5px solid #D5DAE2", borderRadius:"8px", fontWeight:"600", cursor:"pointer"}}>
-          {isSignUp ? "Already have account?" : "Create account"}
-        </button>
-      </div>
-    </div>
-  );
+  return <App session={session} onSignOut={async ()=>{ await sb.auth.signOut(); setSession(null); }}/>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
-  </script>
+
+</script>
 </body>
 </html>
