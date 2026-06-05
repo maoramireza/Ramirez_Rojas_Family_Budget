@@ -47,7 +47,7 @@ const TYPES = ["Income", "Expenses", "Savings"];
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
-const fmt = (n) => (n<0?"-":"") + "$" + Math.abs(Math.round(n)).toLocaleString("en-US");
+const fmt = (n) => { const r = Math.round(n); return (r<0?"-":"") + "$" + Math.abs(r).toLocaleString("en-US"); };
 const fmt2 = (n) => (n<0?"-":"") + "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const uid = () => (window.crypto?.randomUUID?.() || String(Date.now()+Math.random()));
 
@@ -205,6 +205,9 @@ function App({ session, onSignOut }) {
   const deleteBucket = (name) => update((s)=>{ if(!s.buckets||!s.buckets[name]) return; delete s.buckets[name]; s.entries.forEach((e)=>{ if(e.bucket===name) e.bucket=undefined; }); });
   const setBucketForEntry = (id, b) => update((s)=>{ const e=s.entries.find((x)=>x.id===id); if(e) e.bucket=b||undefined; });
 
+  /* ---- expense split between partners (stores Mao's % share; 50 = even default) ---- */
+  const setSplit = (cat, pct) => update((s)=>{ if(!s.split) s.split={}; if(pct===50) delete s.split[cat]; else s.split[cat]=pct; });
+
   /* ---- end year archive ---- */
   const endYear = async () => {
     const yr = year;
@@ -282,7 +285,7 @@ function App({ session, onSignOut }) {
         </header>
 
         <nav className="ap-tabs">
-          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","Year"],["trends","📊 Trends"]].map(([k,l])=>(
+          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","Year"],["trends","📊 Trends"],["split","⚖️ Split"]].map(([k,l])=>(
             <button key={k} className={tab===k?"on":""} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </nav>
@@ -305,6 +308,9 @@ function App({ session, onSignOut }) {
         )}
         {tab==="trends" && (
           <Trends state={state} archives={archives} currentYear={year} endYear={endYear} restoreYear={restoreYear}/>
+        )}
+        {tab==="split" && (
+          <Split state={state} month={month} month_key={month_key} setSplit={setSplit}/>
         )}
 
         <footer className="ap-foot">
@@ -400,7 +406,7 @@ function Envelope({ env, items, month_key, addEntry, onDelete, buckets }) {
   const [note, setNote] = useState("");
   const [bucket, setBucket] = useState("");
   const pct = env.budget>0 ? (env.spent/env.budget)*100 : (env.spent>0?120:0);
-  const over = env.budget>0 && env.spent>env.budget;
+  const over = env.budget>0 && Math.round(env.spent) > Math.round(env.budget);
   const color = over ? "var(--clay)" : pct>85 ? "var(--navy)" : "var(--emerald)";
   const todayISO = new Date().toISOString().slice(0,10);
   const defDate = todayISO.slice(0,7)===month_key ? todayISO : month_key + "-01";
@@ -1038,6 +1044,96 @@ function Trends({ state, archives, currentYear, endYear, restoreYear }) {
   );
 }
 
+/* ================= SPLIT ================= */
+function Split({ state, month, month_key, setSplit }) {
+  const planAmt = (c) => state.plan.Expenses?.[c]?.[month_key] || 0;
+  const cats = state.categories.Expenses.filter((c)=>planAmt(c)>0).sort((a,b)=>planAmt(b)-planAmt(a));
+  const split = state.split || {};
+  // Mao's percent share (0-100). Backward compatible with old "mao"/"ingrid"/"split" values.
+  const pctOf = (c) => { const v=split[c];
+    if (v===undefined || v==="split") return 50;
+    if (v==="mao") return 100; if (v==="ingrid") return 0;
+    const n=Number(v); return isNaN(n)?50:Math.max(0,Math.min(100,Math.round(n))); };
+
+  let mao = 0, ingrid = 0;
+  cats.forEach((c)=>{ const a=planAmt(c); const p=pctOf(c); mao += a*p/100; ingrid += a*(100-p)/100; });
+  const total = mao + ingrid;
+  const half = total/2;
+  const diff = mao - half;
+  const maoPct = total>0 ? Math.round(mao/total*100) : 50;
+  const ingridPct = 100 - maoPct;
+
+  return (
+    <section className="ap-split">
+      <p className="ap-plan-hint" style={{marginBottom:14}}>Set who pays each budgeted expense for <b>{MLABEL[month-1]} {month_key.slice(0,4)}</b>. Use the presets, or tap <b>Custom</b> to split a bill any way — like a 60/40 mortgage or a shared car payment. Totals update live.</p>
+
+      <section className="ap-summary" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+        <Stat label="Mao covers" val={mao} color="var(--navy)"/>
+        <Stat label="Ingrid covers" val={ingrid} color="var(--teal)"/>
+        <Stat label="Total" val={total} hero/>
+      </section>
+
+      {total>0 && (
+        <div className="ap-splitsummary">
+          <div className="ap-splitbar">
+            <div className="m" style={{width:maoPct+"%"}}/>
+            <div className="i" style={{width:ingridPct+"%"}}/>
+          </div>
+          <div className="ap-splitpct">
+            <span><i style={{background:"var(--navy)"}}/>Mao {maoPct}%</span>
+            <span><i style={{background:"var(--teal)"}}/>Ingrid {ingridPct}%</span>
+          </div>
+          <p className="ap-chartnote" style={{marginTop:10}}>
+            {Math.abs(diff) < 0.5
+              ? "Right now you're splitting this evenly."
+              : <>An even split would be <b>{fmt(half)}</b> each. {diff>0?"Mao":"Ingrid"} is covering {fmt(Math.abs(diff))} more than half — if you wanted to even it out, {diff>0?"Ingrid":"Mao"} would chip in that much. Entirely your call.</>}
+          </p>
+        </div>
+      )}
+
+      <div className="ap-splitlist">
+        {cats.map((c)=>(
+          <SplitRow key={c} cat={c} amount={planAmt(c)} pct={pctOf(c)} onSet={(p)=>setSplit(c,p)}/>
+        ))}
+        {cats.length===0 && <p className="ap-empty">No budgeted expenses for {MLABEL[month-1]}. Set budgets in Planning first.</p>}
+      </div>
+    </section>
+  );
+}
+
+function SplitRow({ cat, amount, pct, onSet }) {
+  const isPreset = pct===0 || pct===50 || pct===100;
+  const [showCustom, setShowCustom] = useState(!isPreset);
+  const maoAmt = Math.round(amount*pct/100);
+  const ingridAmt = Math.round(amount) - maoAmt;
+  const preset = (val, label) => (
+    <button className={(!showCustom && pct===val)?"on":""} onClick={()=>{ onSet(val); setShowCustom(false); }}>{label}</button>
+  );
+  return (
+    <div className="ap-splitrowwrap">
+      <div className="ap-splitrow">
+        <div className="ap-splitcat"><span className="nm">{cat}</span><span className="mono amt">{fmt(amount)}</span></div>
+        <div className="ap-seg">
+          {preset(100,"Mao")}
+          {preset(50,"50/50")}
+          {preset(0,"Ingrid")}
+          <button className={showCustom?"on":""} onClick={()=>setShowCustom(true)}>Custom</button>
+        </div>
+      </div>
+      {showCustom && (
+        <div className="ap-customsplit">
+          <input className="ap-splitrange" type="range" min="0" max="100" step="1" value={pct} onChange={(e)=>onSet(Number(e.target.value))}/>
+          <div className="ap-customvals">
+            <span><i style={{background:"var(--navy)"}}/>Mao <b className="mono">{fmt(maoAmt)}</b>
+              <input className="ap-pctin" type="number" min="0" max="100" value={pct} onChange={(e)=>onSet(Math.max(0,Math.min(100,Number(e.target.value)||0)))}/>%</span>
+            <span><i style={{background:"var(--teal)"}}/>Ingrid <b className="mono">{fmt(ingridAmt)}</b> ({100-pct}%)</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function Styles() {
   return (<style>{`
@@ -1269,6 +1365,35 @@ function Styles() {
   .ap-modal-actions{display:flex;flex-direction:column;gap:9px;}
   .ap-modal-primary{font-family:'Archivo';font-weight:700;font-size:14px;background:var(--navy);color:var(--paper2);border:none;border-radius:9px;padding:11px;cursor:pointer;}
   .ap-modal-secondary{font-family:'Archivo';font-weight:600;font-size:13px;background:none;color:var(--ink);border:1.5px solid var(--line);border-radius:9px;padding:10px;cursor:pointer;}
+
+  /* split */
+  .ap-splitsummary{margin-bottom:18px;}
+  .ap-splitbar{display:flex;height:16px;border-radius:8px;overflow:hidden;border:1.5px solid var(--line);}
+  .ap-splitbar .m{background:var(--navy);}
+  .ap-splitbar .i{background:var(--teal);}
+  .ap-splitpct{display:flex;gap:18px;margin-top:8px;font-size:13px;color:var(--ink-soft);font-weight:600;}
+  .ap-splitpct i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+  .ap-splitlist{display:flex;flex-direction:column;gap:8px;}
+  .ap-splitrow{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper2);border:1.5px solid var(--line);border-radius:11px;padding:11px 14px;flex-wrap:wrap;}
+  .ap-splitcat{display:flex;align-items:baseline;gap:10px;flex:1;min-width:140px;}
+  .ap-splitcat .nm{font-weight:600;font-size:14px;}
+  .ap-splitcat .amt{font-size:13px;color:var(--ink-soft);}
+  .ap-seg{display:inline-flex;border:1.5px solid var(--line);border-radius:9px;overflow:hidden;background:var(--paper);}
+  .ap-seg button{font-family:'Archivo';font-weight:600;font-size:13px;border:none;background:none;color:var(--ink-soft);padding:7px 14px;cursor:pointer;border-right:1.5px solid var(--line);}
+  .ap-seg button:last-child{border-right:none;}
+  .ap-seg button.on{background:var(--navy);color:var(--paper2);}
+  .ap-seg button:nth-child(2).on{background:var(--ink);}
+  .ap-seg button:nth-child(3).on{background:var(--teal);}
+  .ap-seg button:nth-child(4).on{background:var(--clay);}
+  .ap-splitrowwrap{background:var(--paper2);border:1.5px solid var(--line);border-radius:11px;padding:11px 14px;}
+  .ap-splitrowwrap .ap-splitrow{background:none;border:none;border-radius:0;padding:0;}
+  .ap-customsplit{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+  .ap-splitrange{width:100%;accent-color:var(--navy);margin:0 0 10px;}
+  .ap-customvals{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);}
+  .ap-customvals i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+  .ap-customvals b{color:var(--ink);margin:0 4px;}
+  .ap-pctin{width:52px;font-family:'JetBrains Mono';font-size:13px;text-align:right;border:1.5px solid var(--line);border-radius:6px;padding:3px 5px;margin-left:6px;outline:none;background:var(--paper);}
+  .ap-pctin:focus{border-color:var(--navy);}
 
   /* login */
   .ap-auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:
