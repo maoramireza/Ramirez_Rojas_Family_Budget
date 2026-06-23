@@ -4,15 +4,25 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ramirez Rojas · Family Budget</title>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>html,body{margin:0;padding:0;}#root{min-height:100vh;}</style>
 </head>
 <body>
 <div id="root"></div>
+<script>
+/* Surface any load/runtime error instead of a blank screen */
+window.addEventListener("error", function(e){
+  var r = document.getElementById("root");
+  if (r && !r.hasChildNodes()) {
+    r.innerHTML = '<div style="font-family:system-ui;max-width:600px;margin:60px auto;padding:24px;border:1px solid #E4B9B3;background:#FBEAE8;border-radius:12px;color:#B23A2E"><b>The app hit an error while loading.</b><br><br>'+
+      (e.message||e.error||"Unknown error")+'<br><br><span style="color:#5E6675;font-size:13px">If this mentions React, Babel, or Supabase, a library failed to load. Try a hard refresh. Otherwise screenshot this and send it over.</span></div>';
+  }
+});
+</script>
 <script type="text/babel" data-presets="react">
 
 const { useState, useEffect, useMemo, useRef } = React;
