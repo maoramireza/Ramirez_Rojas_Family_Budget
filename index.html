@@ -705,8 +705,10 @@ function App({ session, onSignOut }) {
   const [archives, setArchives] = useState([]);
   const [online, setOnline] = useState([]);
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()+1);
+  const [range, setRange] = useState(PRESETS.month());
+  const period = useMemo(() => makePeriod(range), [range]);
+  const year = +range.to.slice(0,4);
+  const openMonth = (key) => setRange({ from: monthStart(key), to: monthEnd(key) });
   const [tab, setTab] = useState("dashboard");
   const [importOpen, setImportOpen] = useState(false);
   const [showLogoutWarning, setShowLogoutWarning] = useState(false);
@@ -810,12 +812,17 @@ function App({ session, onSignOut }) {
     return () => { clearInterval(interval); events.forEach((e)=>document.removeEventListener(e, handleActivity)); };
   }, [loaded]);
 
-  const month_key = mk(year, month);
   const update = (fn) => setState((prev) => { const next = structuredClone(prev); fn(next); return next; });
 
-  const setPlanAmt = (type, cat, key, amt) => update((s) => {
-    s.plan[type] = s.plan[type] || {}; s.plan[type][cat] = s.plan[type][cat] || {};
-    if (amt && amt > 0) s.plan[type][cat][key] = amt; else delete s.plan[type][cat][key];
+  // One month: the change repeats into later months. Several months: only those months change.
+  const setPlanAmt = (type, cat, months, amt) => update((s) => {
+    const v = amt && amt > 0 ? Math.round(amt*100)/100 : 0;
+    if (months.length > 1) ownMonth(s, addMonths(months[months.length-1], 1));
+    months.forEach((k) => {
+      ownMonth(s, k);
+      s.plan[type] = s.plan[type] || {}; s.plan[type][cat] = s.plan[type][cat] || {};
+      if (v) s.plan[type][cat][k] = v; else delete s.plan[type][cat][k];
+    });
   });
   const addCat = (type, name) => update((s) => {
     name = (name||"").trim(); if (!name || s.categories[type].includes(name)) return;
@@ -831,15 +838,28 @@ function App({ session, onSignOut }) {
     if (s.plan[type]?.[oldN]) { s.plan[type][newN] = {...s.plan[type][oldN]}; delete s.plan[type][oldN]; }
     s.entries = s.entries.map((e)=> e.type===type&&e.category===oldN ? {...e, category:newN} : e);
   });
-  const copyFrom = (srcKey) => update((s) => {
-    TYPES.forEach((type)=> s.categories[type].forEach((c)=>{
-      const v = s.plan[type]?.[c]?.[srcKey];
-      s.plan[type]=s.plan[type]||{}; s.plan[type][c]=s.plan[type][c]||{};
-      if (v) s.plan[type][c][month_key] = v;
-    }));
-  });
+  const copyBudget = (srcKey, targets) => {
+    const base = stateRef.current || state;
+    if (!srcKey) return { ok: false, text: "Pick a month to copy from." };
+    const values = [];
+    TYPES.forEach((t) => base.categories[t].forEach((c) => { const v = planFor(base, t, c, srcKey); if (v) values.push([t, c, v]); }));
+    if (!values.length) return { ok: false, text: `${monthLabel(srcKey)} has no budget amounts to copy. Pick another month.` };
+    const own = budgetedMonths(base);
+    const filled = targets.filter((k) => own.includes(k) && TYPES.some((t) => base.categories[t].some((c) => base.plan[t]?.[c]?.[k])));
+    if (filled.length && !confirm(`${filled.map(monthLabel).join(", ")} already ${filled.length > 1 ? "have budgets" : "has a budget"}. Replace with ${monthLabel(srcKey)}'s amounts?`))
+      return { ok: false, text: "Nothing was copied." };
+    update((s) => {
+      if (targets.length > 1) ownMonth(s, addMonths(targets[targets.length - 1], 1));
+      targets.forEach((k) => {
+        ownMonth(s, k);
+        TYPES.forEach((t) => (s.categories[t] || []).forEach((c) => { if (s.plan[t]?.[c]) delete s.plan[t][c][k]; }));
+        values.forEach(([t, c, v]) => { s.plan[t] = s.plan[t] || {}; s.plan[t][c] = s.plan[t][c] || {}; s.plan[t][c][k] = v; });
+      });
+    });
+    return { ok: true, text: `Copied ${values.length} amounts from ${monthLabel(srcKey)} into ${targets.length > 1 ? targets.length + " months" : monthLabel(targets[0])}.` };
+  };
   const resetPlan = () => { if (!confirm("Reset all categories and budget amounts to the original plan? Your logged transactions are kept.")) return;
-    update((s)=>{ s.categories = structuredClone(BASELINE.categories); s.plan = structuredClone(BASELINE.plan); }); };
+    update((s)=>{ s.categories = structuredClone(BASELINE.categories); s.plan = structuredClone(BASELINE.plan); s.planMonths = []; }); };
   const addEntry = (e) => update((s)=> s.entries.unshift(e));
   const editEntry = (id, patch) => update((s)=> { s.entries = s.entries.map((x)=>x.id===id?{...x,...patch}:x); });
   const deleteEntry = (id) => update((s)=> { s.entries = s.entries.filter((x)=>x.id!==id); });
@@ -900,7 +920,7 @@ function App({ session, onSignOut }) {
     try {
       await window.saveArchive(yr, state);
       update((s)=>{ TYPES.forEach((type)=>{ s.plan[type]={}; s.categories[type].forEach((c)=>{ s.plan[type][c]={}; }); }); });
-      setYear(yr+1); setMonth(1);
+      openMonth(`${yr+1}-01`);
       const a = await window.loadArchives(); setArchives(a||[]);
       alert(`✓ ${yr} archived. You're now budgeting ${yr+1}. You can Restore ${yr} anytime.`);
     } catch (e) { alert("Error archiving: " + e.message); }
@@ -915,11 +935,10 @@ function App({ session, onSignOut }) {
       if (a.state.categories) s.categories = structuredClone(a.state.categories);
       if (a.state.buckets) s.buckets = structuredClone(a.state.buckets);
     });
-    setYear(yr); setMonth(1);
+    setRange({ from: `${yr}-01-01`, to: `${yr}-12-31` });
     alert(`✓ ${yr} restored. You're now viewing ${yr}.`);
   };
 
-  const stepMonth = (d) => { let m=month+d, y=year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} setMonth(m); setYear(y); };
 
   if (!loaded || !state) return <div className="ap-root"><Styles/><p className="ap-loading">Loading…</p></div>;
 
@@ -962,45 +981,36 @@ function App({ session, onSignOut }) {
                 {saveStatus==="saving" ? "saving…" : saveStatus==="error" ? "⚠ not saved — tap to retry" : "✓ saved"}
               </span>
             </div>
-            <div className="ap-period">
-              <button className="ap-arrow" onClick={()=>stepMonth(-1)} aria-label="Previous month">‹</button>
-              <select value={month} onChange={(e)=>setMonth(+e.target.value)}>
-                {MLABEL.map((l,i)=>(<option key={l} value={i+1}>{l}</option>))}
-              </select>
-              <input className="ap-year" type="number" value={year} onChange={(e)=>setYear(+e.target.value||year)} />
-              <button className="ap-arrow" onClick={()=>stepMonth(1)} aria-label="Next month">›</button>
-              <button className="ap-todaybtn" onClick={()=>{ const d=new Date(); setYear(d.getFullYear()); setMonth(d.getMonth()+1); }} title="Jump to current month">Today</button>
-            </div>
+            <PeriodBar range={range} setRange={setRange} state={state}/>
           </div>
         </header>
 
         <nav className="ap-tabs">
-          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","Year"],["trends","📊 Trends"],["split","⚖️ Split"]].map(([k,l])=>(
+          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","By month"],["trends","📊 Trends"],["split","⚖️ Split"]].map(([k,l])=>(
             <button key={k} className={tab===k?"on":""} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </nav>
 
         {tab==="dashboard" && (
-          <Dashboard state={state} year={year} month={month} month_key={month_key}
-            addEntry={addEntry} deleteEntry={deleteEntry}/>
+          <Dashboard state={state} period={period} addEntry={addEntry} deleteEntry={deleteEntry}/>
         )}
         {tab==="planning" && (
-          <Planning state={state} year={year} month={month} month_key={month_key}
+          <Planning state={state} period={period}
             setPlanAmt={setPlanAmt} addCat={addCat} removeCat={removeCat} renameCat={renameCat}
-            copyFrom={copyFrom} resetPlan={resetPlan}
+            copyBudget={copyBudget} resetPlan={resetPlan}
             addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket}/>
         )}
         {tab==="year" && (
-          <Year state={state} year={year} goMonth={(m)=>{ setMonth(m); setTab("dashboard"); }}/>
+          <Year state={state} period={period} goMonth={(key)=>{ openMonth(key); setTab("dashboard"); }}/>
         )}
         {tab==="transactions" && (
-          <Transactions state={state} editEntry={editEntry} deleteEntry={deleteEntry} importTxns={importTxns} setBucketForEntry={setBucketForEntry} openImport={()=>setImportOpen(true)}/>
+          <Transactions state={state} period={period} editEntry={editEntry} deleteEntry={deleteEntry} importTxns={importTxns} setBucketForEntry={setBucketForEntry} openImport={()=>setImportOpen(true)}/>
         )}
         {tab==="trends" && (
-          <Trends state={state} archives={archives} currentYear={year} endYear={endYear} restoreYear={restoreYear}/>
+          <Trends state={state} archives={archives} period={period} currentYear={year} endYear={endYear} restoreYear={restoreYear}/>
         )}
         {tab==="split" && (
-          <Split state={state} month={month} month_key={month_key} setSplit={setSplit}/>
+          <Split state={state} period={period} setSplit={setSplit}/>
         )}
 
         <footer className="ap-foot">
@@ -1011,38 +1021,150 @@ function App({ session, onSignOut }) {
   );
 }
 
+/* ================= PERIOD: one date range drives every tab ================= */
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const monthStart = (key) => key + "-01";
+const monthEnd = (key) => { const [y, m] = key.split("-").map(Number); return `${key}-${pad(new Date(y, m, 0).getDate())}`; };
+const addMonths = (key, n) => { const [y, m] = key.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return mk(d.getFullYear(), d.getMonth() + 1); };
+const monthsBetween = (a, b) => { const out = []; for (let k = a; k <= b && out.length < 600; k = addMonths(k, 1)) out.push(k); return out; };
+const addDaysISO = (iso, n) => { const [y, m, d] = iso.split("-").map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`; };
+const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
+const monthLabel = (key) => `${MLABEL[+key.slice(5) - 1]} ${key.slice(0, 4)}`;
+const shiftYear = (iso, n) => { const y = +iso.slice(0, 4) + n; let d = iso.slice(5); if (d === "02-29" && !(y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0))) d = "02-28"; return `${y}-${d}`; };
+const isWholeMonths = (r) => r.from === monthStart(r.from.slice(0, 7)) && r.to === monthEnd(r.to.slice(0, 7));
+
+const PRESETS = {
+  month: () => { const k = localToday().slice(0, 7); return { from: monthStart(k), to: monthEnd(k) }; },
+  last: () => { const k = addMonths(localToday().slice(0, 7), -1); return { from: monthStart(k), to: monthEnd(k) }; },
+  year: () => { const y = localToday().slice(0, 4); return { from: `${y}-01-01`, to: `${y}-12-31` }; },
+};
+function allTimeRange(state) {
+  const today = localToday();
+  const dates = state.entries.map((e) => e.date).filter(Boolean).sort();
+  const bm = budgetedMonths(state);
+  const first = [dates[0], bm[0] && monthStart(bm[0]), today].filter(Boolean).sort()[0];
+  const last = [dates[dates.length - 1], today].filter(Boolean).sort().pop();
+  return { from: monthStart(first.slice(0, 7)), to: monthEnd(last.slice(0, 7)) };
+}
+function describeRange(r) {
+  const fk = r.from.slice(0, 7), tk = r.to.slice(0, 7);
+  const ml = (k) => MLABEL[+k.slice(5) - 1];
+  if (isWholeMonths(r)) {
+    if (fk === tk) return monthLabel(fk);
+    if (fk.slice(5) === "01" && tk.slice(5) === "12" && fk.slice(0, 4) === tk.slice(0, 4)) return fk.slice(0, 4);
+    return fk.slice(0, 4) === tk.slice(0, 4) ? `${ml(fk)} – ${ml(tk)} ${tk.slice(0, 4)}` : `${monthLabel(fk)} – ${monthLabel(tk)}`;
+  }
+  const d = (iso) => `${ml(iso.slice(0, 7))} ${+iso.slice(8)}`;
+  return r.from.slice(0, 4) === r.to.slice(0, 4) ? `${d(r.from)} – ${d(r.to)}, ${r.to.slice(0, 4)}` : `${d(r.from)}, ${r.from.slice(0, 4)} – ${d(r.to)}, ${r.to.slice(0, 4)}`;
+}
+function shiftRange(r, dir) {
+  if (isWholeMonths(r)) {
+    const fk = r.from.slice(0, 7), tk = r.to.slice(0, 7), n = monthsBetween(fk, tk).length * dir;
+    return { from: monthStart(addMonths(fk, n)), to: monthEnd(addMonths(tk, n)) };
+  }
+  const len = daysBetween(r.from, r.to) + 1;
+  return { from: addDaysISO(r.from, len * dir), to: addDaysISO(r.to, len * dir) };
+}
+function makePeriod(r) {
+  const months = monthsBetween(r.from.slice(0, 7), r.to.slice(0, 7));
+  const inRange = (d) => !!d && d >= r.from && d <= r.to;
+  const today = localToday();
+  return { ...r, months, inRange, label: describeRange(r), defaultDate: inRange(today) ? today : r.from };
+}
+
+/* ================= BUDGETS REPEAT =================
+   A month is "budgeted" once it has its own amounts (or was edited/copied into).
+   A month without its own budget uses the most recent budgeted month before it.
+   Budgeted months never change unless you edit them, so past plans stay exactly as they were. */
+const monthCache = new WeakMap();
+function budgetedMonths(state, fresh) {
+  const plan = state.plan || {}, extra = state.planMonths || [];
+  if (!fresh) { const hit = monthCache.get(plan); if (hit && hit.extra === extra) return hit.keys; }
+  const set = new Set(extra);
+  TYPES.forEach((t) => Object.values(plan[t] || {}).forEach((byMonth) => Object.entries(byMonth || {}).forEach(([k, v]) => { if (v) set.add(k); })));
+  const keys = [...set].sort();
+  if (!fresh) monthCache.set(plan, { extra, keys });
+  return keys;
+}
+function budgetSource(state, key, fresh) {
+  const keys = budgetedMonths(state, fresh);
+  let lo = 0, hi = keys.length - 1, ans = null;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (keys[mid] <= key) { ans = keys[mid]; lo = mid + 1; } else hi = mid - 1; }
+  return ans;
+}
+function planFor(state, type, cat, key, fresh) { const src = budgetSource(state, key, fresh); return src ? (state.plan[type]?.[cat]?.[src] || 0) : 0; }
+function planSum(state, type, cat, months) { return months.reduce((a, k) => a + planFor(state, type, cat, k), 0); }
+// Give `key` its own copy of the budget it currently repeats, so editing it can't change other months.
+function ownMonth(s, key) {
+  const own = budgetedMonths(s, true);
+  if (!own.includes(key)) {
+    const src = budgetSource(s, key, true);
+    if (src) TYPES.forEach((t) => (s.categories[t] || []).forEach((c) => {
+      const v = s.plan[t]?.[c]?.[src];
+      if (v) { s.plan[t] = s.plan[t] || {}; s.plan[t][c] = s.plan[t][c] || {}; s.plan[t][c][key] = v; }
+    }));
+  }
+  if (!(s.planMonths || []).includes(key)) s.planMonths = [...(s.planMonths || []), key].sort();
+}
+
+/* ================= HEADER FILTER ================= */
+function PeriodBar({ range, setRange, state }) {
+  const presets = [["month", "This month", PRESETS.month], ["last", "Last month", PRESETS.last], ["year", "This year", PRESETS.year], ["all", "All time", () => allTimeRange(state)]];
+  const same = (r) => r.from === range.from && r.to === range.to;
+  const setFrom = (v) => { if (!v) return; setRange(v <= range.to ? { from: v, to: range.to } : { from: v, to: v }); };
+  const setTo = (v) => { if (!v) return; setRange(v >= range.from ? { from: range.from, to: v } : { from: v, to: v }); };
+  return (
+    <div className="ap-periodctl">
+      <div className="ap-period">
+        <button className="ap-arrow" onClick={() => setRange(shiftRange(range, -1))} aria-label="Previous period">‹</button>
+        <input className="ap-date" type="date" value={range.from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+        <span className="ap-dash">to</span>
+        <input className="ap-date" type="date" value={range.to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+        <button className="ap-arrow" onClick={() => setRange(shiftRange(range, 1))} aria-label="Next period">›</button>
+      </div>
+      <div className="ap-presets">
+        {presets.map(([k, l, f]) => { const r = f(); return <button key={k} className={same(r) ? "on" : ""} onClick={() => setRange(r)}>{l}</button>; })}
+      </div>
+    </div>
+  );
+}
+
 /* ================= DASHBOARD ================= */
-function Dashboard({ state, year, month, month_key, addEntry, deleteEntry }) {
+function Dashboard({ state, period, addEntry, deleteEntry }) {
   const [q, setQ] = useState("");
   const buckets = Object.keys(state.buckets || {});
-  const planAmt = (type, cat) => state.plan[type]?.[cat]?.[month_key] || 0;
-  const monthEntries = state.entries.filter((e)=>e.date.slice(0,7)===month_key);
-  const spentBy = (type) => { const o={}; monthEntries.filter((e)=>e.type===type).forEach((e)=>o[e.category]=(o[e.category]||0)+e.amount); return o; };
+  const planAmt = (type, cat) => planSum(state, type, cat, period.months);
+  const monthEntries = state.entries.filter((e) => period.inRange(e.date));
+  const spentBy = (type) => { const o = {}; monthEntries.filter((e) => e.type === type).forEach((e) => o[e.category] = (o[e.category] || 0) + e.amount); return o; };
 
   const expSpent = spentBy("Expenses");
   const envelopes = useMemo(() => {
     const cats = [...new Set([...state.categories.Expenses, ...Object.keys(expSpent)])];
-    return cats.map((c)=>({ c, budget: planAmt("Expenses",c), spent: expSpent[c]||0 }))
-      .filter((e)=> e.budget>0 || e.spent>0)
-      .map((e)=>({ ...e, remaining: e.budget - e.spent }))
-      .sort((a,b)=> b.budget-a.budget || b.spent-a.spent);
-  }, [state, month_key]);
+    return cats.map((c) => ({ c, budget: planAmt("Expenses", c), spent: expSpent[c] || 0 }))
+      .filter((e) => e.budget > 0 || e.spent > 0)
+      .map((e) => ({ ...e, remaining: e.budget - e.spent }))
+      .sort((a, b) => b.budget - a.budget || b.spent - a.spent);
+  }, [state, period]);
 
-  const incBudget = state.categories.Income.reduce((a,c)=>a+planAmt("Income",c),0);
-  const expBudget = state.categories.Expenses.reduce((a,c)=>a+planAmt("Expenses",c),0);
-  const savBudget = state.categories.Savings.reduce((a,c)=>a+planAmt("Savings",c),0);
-  const spentTotal = monthEntries.filter((e)=>e.type==="Expenses").reduce((a,e)=>a+e.amount,0);
-  const usedPct = expBudget>0 ? (spentTotal/expBudget)*100 : (spentTotal>0?120:0);
+  const incBudget = state.categories.Income.reduce((a, c) => a + planAmt("Income", c), 0);
+  const expBudget = state.categories.Expenses.reduce((a, c) => a + planAmt("Expenses", c), 0);
+  const savBudget = state.categories.Savings.reduce((a, c) => a + planAmt("Savings", c), 0);
+  const spentTotal = monthEntries.filter((e) => e.type === "Expenses").reduce((a, e) => a + e.amount, 0);
+  const usedPct = expBudget > 0 ? (spentTotal / expBudget) * 100 : (spentTotal > 0 ? 120 : 0);
   const remaining = expBudget - spentTotal;
+  const n = period.months.length;
 
   return (
     <>
       <section className="ap-summary">
-        <Stat label="Planned income" val={incBudget} color="var(--emerald)"/>
-        <Stat label="Budgeted" val={expBudget}/>
-        <Stat label="Spent" val={spentTotal} color="var(--clay)"/>
-        <Stat label="Left to spend" val={remaining} color={remaining<0?"var(--clay)":"var(--ink)"} hero/>
+        <Stat label="Planned income" val={incBudget} color="var(--emerald)" />
+        <Stat label="Budgeted" val={expBudget} />
+        <Stat label="Spent" val={spentTotal} color="var(--clay)" />
+        <Stat label="Left to spend" val={remaining} color={remaining < 0 ? "var(--clay)" : "var(--ink)"} hero />
       </section>
+      {(n > 1 || !isWholeMonths(period)) && (
+        <p className="ap-rangenote">Showing <b>{period.label}</b>. Budgets count whole months ({n === 1 ? monthLabel(period.months[0]) : `${n} months, ${monthLabel(period.months[0])} to ${monthLabel(period.months[n - 1])}`}); spending counts only the dates in the range.</p>
+      )}
 
       <div className="ap-overall">
         <div className="ap-overall-top">
@@ -1050,35 +1172,36 @@ function Dashboard({ state, year, month, month_key, addEntry, deleteEntry }) {
           <span className="mono">{fmt(spentTotal)} / {fmt(expBudget)}</span>
         </div>
         <div className="ap-track ap-track-lg">
-          <div className="ap-fill" style={{width:Math.min(usedPct,100)+"%",
-            background: usedPct>100?"var(--clay)":usedPct>85?"var(--navy)":"var(--emerald)"}}/>
+          <div className="ap-fill" style={{ width: Math.min(usedPct, 100) + "%",
+            background: usedPct > 100 ? "var(--clay)" : usedPct > 85 ? "var(--navy)" : "var(--emerald)" }} />
         </div>
-        {savBudget>0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget-expBudget-savBudget)}</div>}
+        {savBudget > 0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget - expBudget - savBudget)}</div>}
       </div>
 
-      <AddBar state={state} month_key={month_key} addEntry={addEntry}/>
+      <AddBar state={state} defDate={period.defaultDate} addEntry={addEntry} />
 
       <div className="ap-envsearch">
-        <input type="text" placeholder="Search expense categories…" value={q} onChange={(e)=>setQ(e.target.value)}/>
-        {q && <button onClick={()=>setQ("")}>×</button>}
+        <input type="text" placeholder="Search expense categories…" value={q} onChange={(e) => setQ(e.target.value)} />
+        {q && <button onClick={() => setQ("")}>×</button>}
       </div>
 
       <section className="ap-env-grid">
-        {envelopes.filter((e)=> !q || e.c.toLowerCase().includes(q.toLowerCase())).map((e)=>(
+        {envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).map((e) => (
           <Envelope key={e.c} env={e}
-            items={monthEntries.filter((x)=>x.type==="Expenses"&&x.category===e.c)}
-            month_key={month_key} addEntry={addEntry}
-            onDelete={deleteEntry} buckets={buckets}/>
+            items={monthEntries.filter((x) => x.type === "Expenses" && x.category === e.c)}
+            defDate={period.defaultDate} addEntry={addEntry}
+            onDelete={deleteEntry} buckets={buckets} />
         ))}
-        {envelopes.length===0 && <p className="ap-loading">No expense budget or spending for {MLABEL[month-1]} {year}. Set one in Planning.</p>}
-        {envelopes.length>0 && envelopes.filter((e)=> !q || e.c.toLowerCase().includes(q.toLowerCase())).length===0 && <p className="ap-loading">No expense category matches "{q}".</p>}
+        {envelopes.length === 0 && <p className="ap-loading">No expense budget or spending for {period.label}. Set one in Planning.</p>}
+        {envelopes.length > 0 && envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).length === 0 && <p className="ap-loading">No expense category matches "{q}".</p>}
       </section>
 
-      <MiniPanel title="Savings" rows={state.categories.Savings} planAmt={(c)=>planAmt("Savings",c)} spent={spentBy("Savings")} accent="teal" verb="saved"/>
-      <MiniPanel title="Income received" rows={state.categories.Income} planAmt={(c)=>planAmt("Income",c)} spent={spentBy("Income")} accent="emerald" verb="received"/>
+      <MiniPanel title="Savings" rows={state.categories.Savings} planAmt={(c) => planAmt("Savings", c)} spent={spentBy("Savings")} accent="teal" verb="saved" />
+      <MiniPanel title="Income received" rows={state.categories.Income} planAmt={(c) => planAmt("Income", c)} spent={spentBy("Income")} accent="emerald" verb="received" />
     </>
   );
 }
+
 
 function Stat({ label, val, color, hero }) {
   return (
@@ -1089,7 +1212,7 @@ function Stat({ label, val, color, hero }) {
   );
 }
 
-function Envelope({ env, items, month_key, addEntry, onDelete, buckets }) {
+function Envelope({ env, items, defDate, addEntry, onDelete, buckets }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [amt, setAmt] = useState("");
@@ -1098,8 +1221,6 @@ function Envelope({ env, items, month_key, addEntry, onDelete, buckets }) {
   const pct = env.budget>0 ? (env.spent/env.budget)*100 : (env.spent>0?120:0);
   const over = env.budget>0 && Math.round(env.spent) > Math.round(env.budget);
   const color = over ? "var(--clay)" : pct>85 ? "var(--navy)" : "var(--emerald)";
-  const todayISO = new Date().toISOString().slice(0,10);
-  const defDate = todayISO.slice(0,7)===month_key ? todayISO : month_key + "-01";
   const submit = () => {
     const a = parseFloat(amt); if (!a || a<=0) return;
     addEntry({ id: uid(), date: defDate, type:"Expenses", category: env.c, amount: Math.round(a*100)/100, note: note.trim(), bucket: bucket||undefined });
@@ -1191,16 +1312,15 @@ function Combo({ value, onChange, options, placeholder }) {
   );
 }
 
-function AddBar({ state, month_key, addEntry }) {
+function AddBar({ state, defDate, addEntry }) {
   const [type, setType] = useState("Expenses");
   const [category, setCategory] = useState(state.categories.Expenses[0] || "");
-  const todayISO = new Date().toISOString().slice(0,10);
-  const dflt = () => todayISO.slice(0,7)===month_key ? todayISO : month_key + "-01";
+  const dflt = () => defDate;
   const [date, setDate] = useState(dflt());
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [bucket, setBucket] = useState("");
-  useEffect(()=>{ setDate(dflt()); }, [month_key]);
+  useEffect(()=>{ setDate(dflt()); }, [defDate]);
   const cats = state.categories[type] || [];
   const buckets = Object.keys(state.buckets || {});
   useEffect(()=>{ if (!cats.includes(category)) setCategory(cats[0]||""); }, [type]);
@@ -1231,40 +1351,59 @@ function AddBar({ state, month_key, addEntry }) {
 }
 
 /* ================= PLANNING ================= */
-function Planning({ state, year, month, month_key, setPlanAmt, addCat, removeCat, renameCat, copyFrom, resetPlan, addBucket, renameBucket, deleteBucket }) {
-  const planAmt = (type, c) => state.plan[type]?.[c]?.[month_key] || 0;
-  const total = (type) => state.categories[type].reduce((a,c)=>a+planAmt(type,c),0);
+/* ================= PLANNING ================= */
+function Planning({ state, period, setPlanAmt, addCat, removeCat, renameCat, copyBudget, resetPlan, addBucket, renameBucket, deleteBucket }) {
+  const months = period.months;
+  const single = months.length === 1;
+  const first = months[0], last = months[months.length - 1];
+  const perMonth = (type, c) => { const vals = months.map((k) => planFor(state, type, c, k)); return vals.every((v) => v === vals[0]) ? vals[0] : null; };
+  const total = (type) => state.categories[type].reduce((a, c) => a + planSum(state, type, c, months), 0);
   const toAllocate = total("Income") - total("Expenses") - total("Savings");
-  const [srcM, setSrcM] = useState(month===1?12:month-1);
-  const [srcY, setSrcY] = useState(month===1?year-1:year);
-  useEffect(()=>{ setSrcM(month===1?12:month-1); setSrcY(month===1?year-1:year); }, [month, year]);
+  const prevKey = addMonths(first, -1);
+  const prevEntries = state.entries.filter((e) => e.date && e.date.slice(0, 7) === prevKey);
+  const actual = (type, c) => prevEntries.filter((e) => e.type === type && e.category === c).reduce((a, e) => a + e.amount, 0);
+  const src = single ? budgetSource(state, first) : null;
+  const inherited = !!(single && src && src !== first);
+  const sources = budgetedMonths(state).slice().reverse().filter((k) => !months.includes(k));
+  const [srcKey, setSrcKey] = useState("");
+  const [msg, setMsg] = useState(null);
+  const sourcesSig = sources.join(",");
+  useEffect(() => { setMsg(null); setSrcKey(sources.find((k) => k < first) || sources[0] || ""); }, [first, last, sourcesSig]);
 
   return (
     <section className="ap-plan">
       <div className="ap-plan-bar">
-        <div className={"ap-alloc"+(toAllocate===0?" ok":toAllocate<0?" neg":"")}>
-          <span>To allocate</span><b>{fmt(toAllocate)}</b>
+        <div className={"ap-alloc" + (toAllocate === 0 ? " ok" : toAllocate < 0 ? " neg" : "")}>
+          <span>{single ? "To allocate" : `To allocate, ${months.length} months`}</span><b>{fmt(toAllocate)}</b>
         </div>
         <div className="ap-plan-actions">
           <div className="ap-copyfrom">
             <span>Copy from</span>
-            <select value={srcM} onChange={(e)=>setSrcM(+e.target.value)}>
-              {MLABEL.map((l,i)=>(<option key={l} value={i+1}>{l}</option>))}
+            <select value={srcKey} onChange={(e) => setSrcKey(e.target.value)} disabled={!sources.length} aria-label="Month to copy from">
+              {sources.length ? sources.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>) : <option value="">No budgeted months yet</option>}
             </select>
-            <input className="src-year" type="number" value={srcY} onChange={(e)=>setSrcY(+e.target.value||srcY)}/>
-            <button onClick={()=>copyFrom(mk(srcY,srcM))}>Copy</button>
+            <button onClick={() => setMsg(copyBudget(srcKey, months))} disabled={!srcKey}>Copy</button>
           </div>
           <button className="ghost" onClick={resetPlan}>Reset to original</button>
         </div>
       </div>
-      <p className="ap-plan-hint">Editing budget for <b>{MLABEL[month-1]} {month_key.slice(0,4)}</b>. Aim to bring "To allocate" to $0 (zero-based budgeting).</p>
+      {msg && <div className={"ap-planmsg" + (msg.ok ? "" : " err")}>{msg.text}</div>}
 
-      <BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket}/>
+      <p className="ap-plan-hint">
+        {single
+          ? <>Editing the budget for <b>{monthLabel(first)}</b>. Amounts repeat into later months until you change them.</>
+          : <>Editing <b>{period.label}</b>. An amount you type applies to each of these {months.length} months only; {monthLabel(addMonths(last, 1))} keeps its own budget. Rows marked "varies" differ between these months.</>}
+        {" "}Aim to bring "To allocate" to $0.
+      </p>
+      {inherited && <p className="ap-inherit-note">{monthLabel(first)} doesn't have its own budget yet, so it's repeating <b>{monthLabel(src)}</b>. Change any amount and {MLABEL[+first.slice(5) - 1]} gets its own budget; later months follow it.</p>}
 
-      {TYPES.map((type)=>(
-        <PlanSection key={type} type={type} cats={state.categories[type]} planAmt={(c)=>planAmt(type,c)}
-          total={total(type)} setPlanAmt={(c,v)=>setPlanAmt(type,c,month_key,v)}
-          addCat={(n)=>addCat(type,n)} removeCat={(c)=>removeCat(type,c)} renameCat={(o,n)=>renameCat(type,o,n)}/>
+      <BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket} />
+
+      {TYPES.map((type) => (
+        <PlanSection key={type} type={type} cats={state.categories[type]} planAmt={(c) => perMonth(type, c)}
+          total={total(type)} setPlanAmt={(c, v) => setPlanAmt(type, c, months, v)}
+          actual={(c) => actual(type, c)} actualLabel={MLABEL[+prevKey.slice(5) - 1]} inherited={inherited} perMonthLabel={single ? "Budget" : "Per month"}
+          addCat={(n) => addCat(type, n)} removeCat={(c) => removeCat(type, c)} renameCat={(o, n) => renameCat(type, o, n)} />
       ))}
     </section>
   );
@@ -1315,64 +1454,69 @@ function BucketName({ name, onRename }) {
   );
 }
 
-function PlanSection({ type, cats, planAmt, total, setPlanAmt, addCat, removeCat, renameCat }) {
+function PlanSection({ type, cats, planAmt, total, setPlanAmt, actual, actualLabel, inherited, perMonthLabel, addCat, removeCat, renameCat }) {
   const [newCat, setNewCat] = useState("");
-  const tone = type==="Income"?"emerald":type==="Savings"?"teal":"clay";
+  const tone = type === "Income" ? "emerald" : type === "Savings" ? "teal" : "clay";
   return (
     <div className="ap-plansec">
       <div className="ap-plansec-head">
-        <h3 style={{color:`var(--${tone})`}}>{type}</h3>
+        <h3 style={{ color: `var(--${tone})` }}>{type}</h3>
         <span className="mono total">{fmt(total)}</span>
       </div>
+      {cats.length > 0 && <div className="ap-planlegend"><span>{actualLabel} actual</span><span>{perMonthLabel}</span></div>}
       <div className="ap-planrows">
-        {cats.map((c)=>(
-          <PlanRow key={c} name={c} amount={planAmt(c)}
-            onAmount={(v)=>setPlanAmt(c,v)} onRename={(n)=>renameCat(c,n)} onRemove={()=>removeCat(c)}/>
+        {cats.map((c) => (
+          <PlanRow key={c} name={c} amount={planAmt(c)} actual={actual(c)} actualLabel={actualLabel} inherited={inherited}
+            onAmount={(v) => setPlanAmt(c, v)} onRename={(n) => renameCat(c, n)} onRemove={() => removeCat(c)} />
         ))}
-        {cats.length===0 && <p className="ap-empty">No categories yet.</p>}
+        {cats.length === 0 && <p className="ap-empty">No categories yet.</p>}
       </div>
       <div className="ap-addcat">
-        <input type="text" placeholder={"+ add "+type.toLowerCase().replace(/s$/,"")+" category"} value={newCat}
-          onChange={(e)=>setNewCat(e.target.value)}
-          onKeyDown={(e)=>{ if(e.key==="Enter"){ addCat(newCat); setNewCat(""); } }}/>
-        <button onClick={()=>{ addCat(newCat); setNewCat(""); }}>Add</button>
+        <input type="text" placeholder={"+ add " + type.toLowerCase().replace(/s$/, "") + " category"} value={newCat}
+          onChange={(e) => setNewCat(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { addCat(newCat); setNewCat(""); } }} />
+        <button onClick={() => { addCat(newCat); setNewCat(""); }}>Add</button>
       </div>
     </div>
   );
 }
 
-function PlanRow({ name, amount, onAmount, onRename, onRemove }) {
+function PlanRow({ name, amount, actual, actualLabel, inherited, onAmount, onRename, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [amtFocus, setAmtFocus] = useState(false);
-  useEffect(()=>setDraft(name),[name]);
-  const shownAmt = amtFocus ? (amount||"") : (amount ? amount.toLocaleString("en-US") : "");
+  useEffect(() => setDraft(name), [name]);
+  const varies = amount === null;
+  const shownAmt = varies ? "" : amtFocus ? (amount || "") : (amount ? amount.toLocaleString("en-US") : "");
   return (
     <div className="ap-planrow">
       {editing ? (
         <input className="ap-renamein" value={draft} autoFocus
-          onChange={(e)=>setDraft(e.target.value)}
-          onBlur={()=>{ onRename(draft); setEditing(false); }}
-          onKeyDown={(e)=>{ if(e.key==="Enter"){ onRename(draft); setEditing(false);} if(e.key==="Escape"){ setDraft(name); setEditing(false);} }}/>
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => { onRename(draft); setEditing(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { onRename(draft); setEditing(false); } if (e.key === "Escape") { setDraft(name); setEditing(false); } }} />
       ) : (
-        <span className="ap-planrow-name" onClick={()=>setEditing(true)} title="Click to rename">{name}</span>
+        <span className="ap-planrow-name" onClick={() => setEditing(true)} title="Click to rename">{name}</span>
       )}
-      <div className="ap-amtwrap">
+      <span className="ap-actual mono" title={`Actually spent or received in ${actualLabel}`}>{actual ? fmt(actual) : "—"}</span>
+      <div className={"ap-amtwrap" + (inherited && !amtFocus ? " inherited" : "")}>
         <span className="cur">$</span>
-        <input type="text" inputMode="numeric" value={shownAmt} placeholder="0"
-          onFocus={()=>setAmtFocus(true)} onBlur={()=>setAmtFocus(false)}
-          onChange={(e)=>onAmount(parseFloat(e.target.value.replace(/[^0-9.]/g,""))||0)}/>
+        <input type="text" inputMode="decimal" value={shownAmt} placeholder={varies ? "varies" : "0"} aria-label={`Budget for ${name}`}
+          onFocus={() => setAmtFocus(true)} onBlur={() => setAmtFocus(false)}
+          onChange={(e) => onAmount(parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)} />
       </div>
       <button className="ap-del" onClick={onRemove} title="Remove category">×</button>
     </div>
   );
 }
 
+
 /* ================= TRANSACTIONS ================= */
-function Transactions({ state, editEntry, deleteEntry, importTxns, setBucketForEntry, openImport }) {
+function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBucketForEntry, openImport }) {
   const [q, setQ] = useState("");
   const [ftype, setFtype] = useState("All");
   const [fcat, setFcat] = useState("All");
+  const [fsrc, setFsrc] = useState("all");   // all | typed | imported | <account last 4>
   const [editId, setEditId] = useState(null);
   const [msg, setMsg] = useState("");
   const fileRef = useRef(null);
@@ -1388,7 +1532,12 @@ function Transactions({ state, editEntry, deleteEntry, importTxns, setBucketForE
   }, [state, ftype]);
 
   const nq = norm(q);
+  const accounts = (state.importer && state.importer.accounts) || {};
+  const acctIds = [...new Set(state.entries.map((e)=>e.src?.acct).filter(Boolean))].sort();
+  const srcOk = (x) => fsrc==="all" ? true : fsrc==="typed" ? !x.importId : fsrc==="imported" ? !!x.importId : x.src?.acct===fsrc;
   const list = state.entries
+    .filter((x)=> period.inRange(x.date))
+    .filter(srcOk)
     .filter((x)=> ftype==="All" ? true : x.type===ftype)
     .filter((x)=> fcat==="All" ? true : x.category===fcat)
     .filter((x)=> nq==="" ? true : (norm(x.category).includes(nq) || norm(x.note).includes(nq) || norm(x.name).includes(nq)))
@@ -1436,11 +1585,17 @@ function Transactions({ state, editEntry, deleteEntry, importTxns, setBucketForE
           <option value="All">All categories</option>
           {catOptions.map((c)=>(<option key={c} value={c}>{c}</option>))}
         </select>
+        <select value={fsrc} onChange={(e)=>setFsrc(e.target.value)} aria-label="Source">
+          <option value="all">All sources</option>
+          <option value="typed">Typed by hand</option>
+          <option value="imported">From statements</option>
+          {acctIds.map((id)=>(<option key={id} value={id}>{SI.acctLabel(id, accounts[id]?.kind, accounts[id])}</option>))}
+        </select>
         <button className="ap-iobtn strong" onClick={openImport}>Import statement</button>
         <button className="ap-iobtn" onClick={exportCsv}>Export CSV</button>
         <button className="ap-iobtn" onClick={()=>fileRef.current?.click()}>Import CSV</button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={onFile}/>
-        <div className="ap-count">{list.length} records · net <b style={{color:net>=0?"var(--emerald)":"var(--clay)"}}>{fmt(net)}</b></div>
+        <div className="ap-count">{list.length} records in {period.label} · net <b style={{color:net>=0?"var(--emerald)":"var(--clay)"}}>{fmt(net)}</b></div>
       </div>
       {msg && <div className="ap-importmsg">{msg}</div>}
       <div className="ap-txnscroll">
@@ -1476,7 +1631,7 @@ function Transactions({ state, editEntry, deleteEntry, importTxns, setBucketForE
                 </td>
               </tr>
             ))}
-            {list.length===0 && <tr><td colSpan={7} className="ap-empty">{state.entries.length ? "No transactions match these filters." : "No transactions yet — log some from the Dashboard."}</td></tr>}
+            {list.length===0 && <tr><td colSpan={7} className="ap-empty">{state.entries.length ? `No transactions in ${period.label} match these filters. Try All time in the date filter at the top.` : "No transactions yet — log some from the Dashboard."}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1516,7 +1671,7 @@ function YearChart({ data }) {
               <title>{d.name + " Income: $" + d.Income.toLocaleString()}</title></rect>
             <rect x={cx + 1} y={Math.min(y(d.Expenses), zero)} width={barW} height={Math.abs(zero - y(d.Expenses))} fill="var(--clay)" rx="2">
               <title>{d.name + " Expenses: $" + d.Expenses.toLocaleString()}</title></rect>
-            <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill="var(--ink-soft)">{d.name}</text>
+            {(data.length <= 13 || i % Math.ceil(data.length / 12) === 0) && <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill="var(--ink-soft)">{d.name}</text>}
           </g>
         );
       })}
@@ -1529,49 +1684,48 @@ function YearChart({ data }) {
   );
 }
 
-function Year({ state, year, goMonth }) {
-  const planExp = (m) => state.categories.Expenses.reduce((a,c)=> a + (state.plan.Expenses?.[c]?.[mk(year,m)]||0), 0);
-  const rows = useMemo(() => Array.from({length:12}, (_,i)=>{
-    const m = i+1, key = mk(year,m);
-    const ent = state.entries.filter((e)=>e.date.slice(0,7)===key);
-    const inc = ent.filter((e)=>e.type==="Income").reduce((a,e)=>a+e.amount,0);
-    const exp = ent.filter((e)=>e.type==="Expenses").reduce((a,e)=>a+e.amount,0);
-    const sav = ent.filter((e)=>e.type==="Savings").reduce((a,e)=>a+e.amount,0);
-    return { m, label: MLABEL[i], inc, exp, sav, budget: planExp(m), net: inc-exp, count: ent.length };
-  }), [state, year]);
+function Year({ state, period, goMonth }) {
+  const ms = period.months;
+  const multiYear = ms[0].slice(0, 4) !== ms[ms.length - 1].slice(0, 4);
+  const inR = useMemo(() => state.entries.filter((e) => period.inRange(e.date)), [state, period]);
+  const rows = useMemo(() => ms.map((key) => {
+    const ent = inR.filter((e) => e.date.slice(0, 7) === key);
+    const sum = (t) => ent.filter((e) => e.type === t).reduce((a, e) => a + e.amount, 0);
+    const inc = sum("Income"), exp = sum("Expenses"), sav = sum("Savings");
+    const budget = state.categories.Expenses.reduce((a, c) => a + planFor(state, "Expenses", c, key), 0);
+    return { key, label: MLABEL[+key.slice(5) - 1] + (multiYear ? " ’" + key.slice(2, 4) : ""), inc, exp, sav, budget, net: inc - exp, count: ent.length };
+  }), [state, period, inR]);
 
-  const tot = rows.reduce((a,r)=>({inc:a.inc+r.inc, exp:a.exp+r.exp, sav:a.sav+r.sav, budget:a.budget+r.budget}),{inc:0,exp:0,sav:0,budget:0});
+  const tot = rows.reduce((a, r) => ({ inc: a.inc + r.inc, exp: a.exp + r.exp, sav: a.sav + r.sav, budget: a.budget + r.budget }), { inc: 0, exp: 0, sav: 0, budget: 0 });
 
   const catMap = {};
-  state.entries.filter((e)=>e.type==="Expenses" && e.date.slice(0,4)===String(year))
-    .forEach((e)=>{ catMap[e.category]=(catMap[e.category]||0)+e.amount; });
-  const topCats = Object.entries(catMap).map(([c,v])=>({c,v})).sort((a,b)=>b.v-a.v).slice(0,10);
+  inR.filter((e) => e.type === "Expenses").forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; });
+  const topCats = Object.entries(catMap).map(([c, v]) => ({ c, v })).sort((a, b) => b.v - a.v).slice(0, 10);
   const maxCat = topCats[0]?.v || 1;
 
   const bucketMap = {};
-  state.entries.filter((e)=>e.type==="Expenses" && e.date.slice(0,4)===String(year))
-    .forEach((e)=>{ const b = e.bucket || "Untagged"; bucketMap[b]=(bucketMap[b]||0)+e.amount; });
-  const topBuckets = Object.entries(bucketMap).map(([c,v])=>({c,v})).sort((a,b)=>b.v-a.v);
+  inR.filter((e) => e.type === "Expenses").forEach((e) => { const b = e.bucket || "Untagged"; bucketMap[b] = (bucketMap[b] || 0) + e.amount; });
+  const topBuckets = Object.entries(bucketMap).map(([c, v]) => ({ c, v })).sort((a, b) => b.v - a.v);
   const maxBucket = topBuckets[0]?.v || 1;
-  const hasBucketSpend = topBuckets.some((b)=>b.c!=="Untagged");
+  const hasBucketSpend = topBuckets.some((b) => b.c !== "Untagged");
 
-  const chartData = rows.map((r)=>({ name:r.label, Income:Math.round(r.inc), Expenses:Math.round(r.exp), Net:Math.round(r.net) }));
-  const hasData = tot.inc>0 || tot.exp>0;
+  const chartData = rows.map((r) => ({ name: r.label, Income: Math.round(r.inc), Expenses: Math.round(r.exp), Net: Math.round(r.net) }));
+  const hasData = tot.inc > 0 || tot.exp > 0;
 
   return (
     <>
       <section className="ap-summary">
-        <Stat label={year+" income"} val={tot.inc} color="var(--emerald)"/>
-        <Stat label="Expenses" val={tot.exp} color="var(--clay)"/>
-        <Stat label="Saved" val={tot.sav} color="var(--teal)"/>
-        <Stat label="Net" val={tot.inc-tot.exp} color={(tot.inc-tot.exp)<0?"var(--clay)":"var(--ink)"} hero/>
+        <Stat label="Income" val={tot.inc} color="var(--emerald)" />
+        <Stat label="Expenses" val={tot.exp} color="var(--clay)" />
+        <Stat label="Saved" val={tot.sav} color="var(--teal)" />
+        <Stat label="Net" val={tot.inc - tot.exp} color={(tot.inc - tot.exp) < 0 ? "var(--clay)" : "var(--ink)"} hero />
       </section>
 
-      <div className="ap-card" style={{marginBottom:16}}>
-        <h3 className="ap-mini-t" style={{marginBottom:6}}>Monthly flow · {year}</h3>
-        {hasData ? <YearChart data={chartData}/> : <p className="ap-empty">No transactions logged in {year} yet.</p>}
-        <div className="ap-legend"><span><i style={{background:"var(--emerald)"}}/>Income</span>
-          <span><i style={{background:"var(--clay)"}}/>Expenses</span><span><i style={{background:"var(--navy)"}}/>Net</span></div>
+      <div className="ap-card" style={{ marginBottom: 16 }}>
+        <h3 className="ap-mini-t" style={{ marginBottom: 6 }}>Monthly flow · {period.label}</h3>
+        {hasData ? <YearChart data={chartData} /> : <p className="ap-empty">No transactions logged in {period.label}.</p>}
+        <div className="ap-legend"><span><i style={{ background: "var(--emerald)" }} />Income</span>
+          <span><i style={{ background: "var(--clay)" }} />Expenses</span><span><i style={{ background: "var(--navy)" }} />Net</span></div>
         <p className="ap-chartnote">The <b>Net</b> line is income minus expenses each month. Above $0 you came out ahead; below $0 you spent more than came in.</p>
       </div>
 
@@ -1581,130 +1735,147 @@ function Year({ state, year, goMonth }) {
           <table className="ap-yeartable">
             <thead><tr><th>Month</th><th className="r">Budget</th><th className="r">Spent</th><th className="r">Δ</th><th className="r">Net</th></tr></thead>
             <tbody>
-              {rows.map((r)=>{
+              {rows.map((r) => {
                 const d = r.budget - r.exp;
                 return (
-                  <tr key={r.m} onClick={()=>goMonth(r.m)} title="Open this month">
-                    <td className="mlbl">{r.label}{r.count>0 && <em className="ap-cnt">{r.count}</em>}</td>
-                    <td className="r mono dim">{r.budget?fmt(r.budget):"—"}</td>
-                    <td className="r mono">{r.exp?fmt(r.exp):"—"}</td>
-                    <td className="r mono" style={{color: r.budget? (d>=0?"var(--emerald)":"var(--clay)"):"var(--ink-soft)"}}>{r.budget?((d>=0?"+":"")+fmt(d)):"—"}</td>
-                    <td className="r mono" style={{color: r.net>=0?"var(--emerald)":"var(--clay)"}}>{(r.inc||r.exp)?fmt(r.net):"—"}</td>
+                  <tr key={r.key} onClick={() => goMonth(r.key)} title="Open this month">
+                    <td className="mlbl">{r.label}{r.count > 0 && <em className="ap-cnt">{r.count}</em>}</td>
+                    <td className="r mono dim">{r.budget ? fmt(r.budget) : "—"}</td>
+                    <td className="r mono">{r.exp ? fmt(r.exp) : "—"}</td>
+                    <td className="r mono" style={{ color: r.budget ? (d >= 0 ? "var(--emerald)" : "var(--clay)") : "var(--ink-soft)" }}>{r.budget ? ((d >= 0 ? "+" : "") + fmt(d)) : "—"}</td>
+                    <td className="r mono" style={{ color: r.net >= 0 ? "var(--emerald)" : "var(--clay)" }}>{(r.inc || r.exp) ? fmt(r.net) : "—"}</td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot><tr><td>Total</td><td className="r mono dim">{fmt(tot.budget)}</td><td className="r mono">{fmt(tot.exp)}</td>
-              <td className="r mono" style={{color:(tot.budget-tot.exp)>=0?"var(--emerald)":"var(--clay)"}}>{((tot.budget-tot.exp)>=0?"+":"")+fmt(tot.budget-tot.exp)}</td>
-              <td className="r mono" style={{color:(tot.inc-tot.exp)>=0?"var(--emerald)":"var(--clay)"}}>{fmt(tot.inc-tot.exp)}</td></tr></tfoot>
+              <td className="r mono" style={{ color: (tot.budget - tot.exp) >= 0 ? "var(--emerald)" : "var(--clay)" }}>{((tot.budget - tot.exp) >= 0 ? "+" : "") + fmt(tot.budget - tot.exp)}</td>
+              <td className="r mono" style={{ color: (tot.inc - tot.exp) >= 0 ? "var(--emerald)" : "var(--clay)" }}>{fmt(tot.inc - tot.exp)}</td></tr></tfoot>
           </table>
         </div>
 
         <div className="ap-card">
-          <h3 className="ap-mini-t">Top categories · {year}</h3>
+          <h3 className="ap-mini-t">Top categories · {period.label}</h3>
           {topCats.length ? (
             <ul className="ap-catbars">
-              {topCats.map((t)=>(
+              {topCats.map((t) => (
                 <li key={t.c}>
                   <div className="row"><span className="nm">{t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
-                  <div className="ap-track ap-track-sm"><div className="ap-fill" style={{width:(t.v/maxCat*100)+"%",background:"var(--clay)"}}/></div>
+                  <div className="ap-track ap-track-sm"><div className="ap-fill" style={{ width: (t.v / maxCat * 100) + "%", background: "var(--clay)" }} /></div>
                 </li>
               ))}
             </ul>
-          ) : <p className="ap-empty">Nothing spent in {year} yet.</p>}
+          ) : <p className="ap-empty">Nothing spent in {period.label}.</p>}
         </div>
       </div>
 
-      <div className="ap-card" style={{marginTop:14}}>
-        <h3 className="ap-mini-t">Top buckets · {year}</h3>
+      <div className="ap-card" style={{ marginTop: 14 }}>
+        <h3 className="ap-mini-t">Top buckets · {period.label}</h3>
         {hasBucketSpend ? (
           <ul className="ap-catbars">
-            {topBuckets.map((t)=>(
+            {topBuckets.map((t) => (
               <li key={t.c}>
-                <div className="row"><span className="nm">{t.c==="Untagged" ? <span className="dim">Untagged</span> : t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
-                <div className="ap-track ap-track-sm"><div className="ap-fill" style={{width:(t.v/maxBucket*100)+"%",background:t.c==="Untagged"?"var(--line)":"var(--navy)"}}/></div>
+                <div className="row"><span className="nm">{t.c === "Untagged" ? <span className="dim">Untagged</span> : t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
+                <div className="ap-track ap-track-sm"><div className="ap-fill" style={{ width: (t.v / maxBucket * 100) + "%", background: t.c === "Untagged" ? "var(--line)" : "var(--navy)" }} /></div>
               </li>
             ))}
           </ul>
-        ) : <p className="ap-empty">No bucketed spending in {year} yet. Tag expenses with a bucket when you log them, and they'll group here.</p>}
+        ) : <p className="ap-empty">No bucketed spending in {period.label}. Tag expenses with a bucket when you log them, and they'll group here.</p>}
       </div>
     </>
   );
 }
 
-/* ================= TRENDS ================= */
-function Trends({ state, archives, currentYear, endYear, restoreYear }) {
-  const [selectedCats, setSelectedCats] = useState(["Groceries"]);
-  const allYears = useMemo(() => {
-    const years = []; const yearMap = {};
-    (archives || []).forEach((a) => { if (a.year && a.state) { yearMap[a.year] = a.state; years.push(a.year); } });
-    yearMap[currentYear] = state; years.push(currentYear);
-    return { years: [...new Set(years)].sort((a,b)=>a-b), yearMap };
-  }, [archives, state, currentYear]);
 
-  const expenseCategories = state.categories.Expenses || [];
+/* ================= TRENDS ================= */
+function Trends({ state, archives, period, currentYear, endYear, restoreYear }) {
+  const [selectedCats, setSelectedCats] = useState(["Groceries"]);
+  const tooLong = daysBetween(period.from, period.to) > 366;
+  const allEntries = useMemo(() => {
+    const seen = new Set(state.entries.map((e) => e.id));
+    const extra = [];
+    (archives || []).forEach((a) => (a.state?.entries || []).forEach((e) => { if (!seen.has(e.id)) { seen.add(e.id); extra.push(e); } }));
+    return [...state.entries, ...extra];
+  }, [state, archives]);
+  const baseYear = +period.to.slice(0, 4);
+  const years = useMemo(() => {
+    const ys = new Set(allEntries.map((e) => +String(e.date).slice(0, 4)).filter((y) => y > 1900));
+    ys.add(baseYear);
+    return [...ys].sort((a, b) => a - b);
+  }, [allEntries, baseYear]);
+  const windowFor = (yr) => ({ from: shiftYear(period.from, yr - baseYear), to: shiftYear(period.to, yr - baseYear) });
   const trendData = useMemo(() => {
     const result = {};
     selectedCats.forEach((cat) => {
       result[cat] = {};
-      allYears.years.forEach((yr) => {
-        const ys = allYears.yearMap[yr];
-        const entries = ys ? (ys.entries || []).filter((e)=>e.type==="Expenses" && e.category===cat && e.date.slice(0,4)===String(yr)) : [];
-        result[cat][yr] = entries.reduce((a,e)=>a+e.amount,0);
+      years.forEach((yr) => {
+        const w = windowFor(yr);
+        result[cat][yr] = allEntries.filter((e) => e.type === "Expenses" && e.category === cat && e.date >= w.from && e.date <= w.to).reduce((a, e) => a + e.amount, 0);
       });
     });
     return result;
-  }, [selectedCats, allYears]);
+  }, [selectedCats, allEntries, years, period]);
 
+  const expenseCategories = state.categories.Expenses || [];
   const colors = ["var(--clay)", "var(--teal)", "var(--navy)", "var(--emerald)"];
+  const maxV = Math.max(1, ...selectedCats.flatMap((c) => years.map((y) => trendData[c]?.[y] || 0)));
+  const p10 = Math.pow(10, Math.floor(Math.log10(maxV)));
+  const top = Math.ceil(maxV / p10) * p10;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * top);
+  const yPos = (v) => 250 - (v / top) * 200;
+  const tickLbl = (v) => v >= 1000 ? `$${+(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`;
+  const W = 50 + years.length * 80;
 
   return (
     <section className="ap-trends">
       <div className="ap-trends-head">
-        <h2 className="ap-mini-t" style={{fontSize:24,margin:"0 0 12px"}}>Spending trends</h2>
+        <h2 className="ap-mini-t" style={{ fontSize: 24, margin: "0 0 6px" }}>Spending trends</h2>
+        <p className="ap-chartnote" style={{ margin: "0 0 12px" }}>Spending in <b>{period.label}</b>, compared with the same dates in other years.</p>
         <div className="ap-trend-opts">
           <label>Compare categories:</label>
-          <select multiple value={selectedCats} onChange={(e)=>{ const opts=Array.from(e.target.selectedOptions,(o)=>o.value); setSelectedCats(opts.length>0?opts:["Groceries"]); }} className="ap-multiselect">
-            {expenseCategories.map((c)=>(<option key={c} value={c}>{c}</option>))}
+          <select multiple value={selectedCats} onChange={(e) => { const opts = Array.from(e.target.selectedOptions, (o) => o.value); setSelectedCats(opts.length > 0 ? opts : ["Groceries"]); }} className="ap-multiselect">
+            {expenseCategories.map((c) => (<option key={c} value={c}>{c}</option>))}
           </select>
         </div>
       </div>
 
-      {allYears.years.length > 1 ? (
+      {tooLong ? (
+        <div className="ap-card"><p className="ap-empty">Pick a range of a year or less (for example This year, or Jul 1 to Sep 30) to compare it across years.</p></div>
+      ) : years.length > 1 ? (
         <>
-          <div className="ap-card" style={{marginBottom:16}}>
-            <svg viewBox={`0 0 ${50 + allYears.years.length * 80} 300`} width="100%" height="280" preserveAspectRatio="xMidYMid meet">
-              {[0,1000,2000,3000,4000,5000].map((val)=>{ const yy=250-(val/5000)*200; return (
+          <div className="ap-card" style={{ marginBottom: 16 }}>
+            <svg viewBox={`0 0 ${W} 300`} width="100%" height="280" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Spending by year">
+              {ticks.map((val) => (
                 <g key={`g-${val}`}>
-                  <line x1="40" y1={yy} x2={40+allYears.years.length*80} y2={yy} stroke="var(--line)" strokeWidth="0.5"/>
-                  <text x="35" y={yy+4} fontSize="10" fill="var(--ink-soft)" textAnchor="end" fontFamily="JetBrains Mono">${(val/1000)}k</text>
-                </g>); })}
-              {selectedCats.map((cat,ci)=>{
-                const points = allYears.years.map((yr,i)=>{ const v=trendData[cat]?.[yr]||0; return `${50+i*80},${250-(v/5000)*200}`; }).join(" ");
+                  <line x1="40" y1={yPos(val)} x2={W - 10} y2={yPos(val)} stroke="var(--line)" strokeWidth="0.5" />
+                  <text x="35" y={yPos(val) + 4} fontSize="10" fill="var(--ink-soft)" textAnchor="end" fontFamily="JetBrains Mono">{tickLbl(val)}</text>
+                </g>))}
+              {selectedCats.map((cat, ci) => {
+                const points = years.map((yr, i) => `${50 + i * 80},${yPos(trendData[cat]?.[yr] || 0)}`).join(" ");
                 return (<g key={`l-${cat}`}>
-                  <polyline points={points} fill="none" stroke={colors[ci%colors.length]} strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>
-                  {allYears.years.map((yr,i)=>{ const v=trendData[cat]?.[yr]||0; return <circle key={`d-${cat}-${yr}`} cx={50+i*80} cy={250-(v/5000)*200} r="3" fill={colors[ci%colors.length]}/>; })}
+                  <polyline points={points} fill="none" stroke={colors[ci % colors.length]} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                  {years.map((yr, i) => <circle key={`d-${cat}-${yr}`} cx={50 + i * 80} cy={yPos(trendData[cat]?.[yr] || 0)} r="3" fill={colors[ci % colors.length]} />)}
                 </g>);
               })}
-              <line x1="40" y1="250" x2={40+allYears.years.length*80} y2="250" stroke="var(--line)" strokeWidth="1.5"/>
-              {allYears.years.map((yr,i)=>(<text key={`y-${yr}`} x={50+i*80} y="275" fontSize="12" fill="var(--ink-soft)" textAnchor="middle" fontFamily="JetBrains Mono">{yr}</text>))}
+              <line x1="40" y1="250" x2={W - 10} y2="250" stroke="var(--line)" strokeWidth="1.5" />
+              {years.map((yr, i) => (<text key={`y-${yr}`} x={50 + i * 80} y="275" fontSize="12" fill="var(--ink-soft)" textAnchor="middle" fontFamily="JetBrains Mono">{yr}</text>))}
             </svg>
-            <div className="ap-legend">{selectedCats.map((cat,i)=>(<span key={cat}><i style={{background:colors[i%colors.length]}}/>{cat}</span>))}</div>
+            <div className="ap-legend">{selectedCats.map((cat, i) => (<span key={cat}><i style={{ background: colors[i % colors.length] }} />{cat}</span>))}</div>
           </div>
 
           <div className="ap-card">
             <table className="ap-yeartable">
-              <thead><tr><th>Category</th>{allYears.years.map((yr)=>(<th key={yr} className="r">{yr}</th>))}<th className="r">Change</th><th className="r">%</th></tr></thead>
+              <thead><tr><th>Category</th>{years.map((yr) => (<th key={yr} className="r">{yr}</th>))}<th className="r">Change</th><th className="r">%</th></tr></thead>
               <tbody>
-                {selectedCats.map((cat)=>{
-                  const vals = allYears.years.map((yr)=>trendData[cat]?.[yr]||0);
-                  const last = vals[vals.length-1], prev = vals[vals.length-2]||0;
-                  const change = last-prev, pct = prev>0?((change/prev)*100):0;
+                {selectedCats.map((cat) => {
+                  const vals = years.map((yr) => trendData[cat]?.[yr] || 0);
+                  const lastV = vals[vals.length - 1], prev = vals[vals.length - 2] || 0;
+                  const change = lastV - prev, pct = prev > 0 ? ((change / prev) * 100) : 0;
                   return (<tr key={cat}>
                     <td className="mlbl">{cat}</td>
-                    {vals.map((v,i)=>(<td key={allYears.years[i]} className="r mono">{fmt(v)}</td>))}
-                    <td className="r mono" style={{color:change>=0?"var(--clay)":"var(--emerald)"}}>{(change>=0?"+":"")+fmt(change)}</td>
-                    <td className="r mono" style={{color:pct>=0?"var(--clay)":"var(--emerald)"}}>{(pct>=0?"+":"")+pct.toFixed(0)}%</td>
+                    {vals.map((v, i) => (<td key={years[i]} className="r mono">{fmt(v)}</td>))}
+                    <td className="r mono" style={{ color: change >= 0 ? "var(--clay)" : "var(--emerald)" }}>{(change >= 0 ? "+" : "") + fmt(change)}</td>
+                    <td className="r mono" style={{ color: pct >= 0 ? "var(--clay)" : "var(--emerald)" }}>{(pct >= 0 ? "+" : "") + pct.toFixed(0)}%</td>
                   </tr>);
                 })}
               </tbody>
@@ -1712,20 +1883,20 @@ function Trends({ state, archives, currentYear, endYear, restoreYear }) {
           </div>
         </>
       ) : (
-        <div className="ap-card"><p className="ap-empty">Only {currentYear} so far. At year-end, use <b>Archive {currentYear}</b> below — then you'll see year-over-year trends here.</p></div>
+        <div className="ap-card"><p className="ap-empty">Only {baseYear} has transactions so far. Once there's another year of spending, it's compared here.</p></div>
       )}
 
       <div className="ap-card ap-manageyears">
         <h3 className="ap-mini-t">Manage years</h3>
-        <p className="ap-chartnote" style={{margin:"0 0 14px"}}>Archiving snapshots the current year and clears the plan so you can start fresh. It's <b>reversible</b> — your transactions are never deleted, and you can restore any year below.</p>
-        <button className="ap-archivebtn" onClick={endYear}>Archive {currentYear} &amp; start {currentYear+1}</button>
-        {(archives && archives.length>0) && (
+        <p className="ap-chartnote" style={{ margin: "0 0 14px" }}>Archiving snapshots the current year and clears the plan so you can start fresh. It's <b>reversible</b>: your transactions are never deleted, and you can restore any year below.</p>
+        <button className="ap-archivebtn" onClick={endYear}>Archive {currentYear} &amp; start {currentYear + 1}</button>
+        {(archives && archives.length > 0) && (
           <div className="ap-archlist">
             <div className="ap-archlbl">Archived years</div>
-            {archives.slice().sort((a,b)=>b.year-a.year).map((a)=>(
+            {archives.slice().sort((a, b) => b.year - a.year).map((a) => (
               <div key={a.year} className="ap-archrow">
                 <span className="yr">{a.year}</span>
-                <button className="ap-restorebtn" onClick={()=>restoreYear(a.year)}>Restore</button>
+                <button className="ap-restorebtn" onClick={() => restoreYear(a.year)}>Restore</button>
               </div>
             ))}
           </div>
@@ -1736,8 +1907,8 @@ function Trends({ state, archives, currentYear, endYear, restoreYear }) {
 }
 
 /* ================= SPLIT ================= */
-function Split({ state, month, month_key, setSplit }) {
-  const planAmt = (c) => state.plan.Expenses?.[c]?.[month_key] || 0;
+function Split({ state, period, setSplit }) {
+  const planAmt = (c) => planSum(state, "Expenses", c, period.months);
   const cats = state.categories.Expenses.filter((c)=>planAmt(c)>0).sort((a,b)=>planAmt(b)-planAmt(a));
   const split = state.split || {};
   // Mao's percent share (0-100). Backward compatible with old "mao"/"ingrid"/"split" values.
@@ -1756,7 +1927,7 @@ function Split({ state, month, month_key, setSplit }) {
 
   return (
     <section className="ap-split">
-      <p className="ap-plan-hint" style={{marginBottom:14}}>Set who pays each budgeted expense for <b>{MLABEL[month-1]} {month_key.slice(0,4)}</b>. Use the presets, or tap <b>Custom</b> to split a bill any way — like a 60/40 mortgage or a shared car payment. Totals update live.</p>
+      <p className="ap-plan-hint" style={{marginBottom:14}}>Set who pays each budgeted expense for <b>{period.label}</b>. Use the presets, or tap <b>Custom</b> to split a bill any way — like a 60/40 mortgage or a shared car payment. Totals update live.</p>
 
       <section className="ap-summary" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
         <Stat label="Mao covers" val={mao} color="var(--navy)"/>
@@ -1786,7 +1957,7 @@ function Split({ state, month, month_key, setSplit }) {
         {cats.map((c)=>(
           <SplitRow key={c} cat={c} amount={planAmt(c)} pct={pctOf(c)} onSet={(p)=>setSplit(c,p)}/>
         ))}
-        {cats.length===0 && <p className="ap-empty">No budgeted expenses for {MLABEL[month-1]}. Set budgets in Planning first.</p>}
+        {cats.length===0 && <p className="ap-empty">No budgeted expenses for {period.label}. Set budgets in Planning first.</p>}
       </div>
     </section>
   );
@@ -2533,6 +2704,33 @@ function Styles() {
   .ap-customvals b{color:var(--ink);margin:0 4px;}
   .ap-pctin{width:52px;font-family:'JetBrains Mono';font-size:13px;text-align:right;border:1.5px solid var(--line);border-radius:6px;padding:3px 5px;margin-left:6px;outline:none;background:var(--paper);}
   .ap-pctin:focus{border-color:var(--navy);}
+
+  /* period filter + repeating budgets */
+  .ap-periodctl{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .ap-date{font-family:'Archivo';font-weight:600;font-size:14px;color:var(--ink);background:transparent;border:none;outline:none;padding:6px 4px;border-radius:7px;min-width:0;}
+  .ap-date:focus-visible{outline:2px solid var(--navy);}
+  .ap-dash{font-size:12px;color:var(--ink-soft);}
+  .ap-presets{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
+  .ap-presets button{font-family:'Archivo';font-weight:600;font-size:12px;background:var(--paper2);border:1.5px solid var(--line);border-radius:20px;padding:4px 11px;cursor:pointer;color:var(--ink-soft);}
+  .ap-presets button:hover{border-color:var(--navy);color:var(--ink);}
+  .ap-presets button.on{background:var(--navy);border-color:var(--navy);color:var(--paper2);}
+  .ap-rangenote{font-size:12.5px;color:var(--ink-soft);margin:-6px 0 14px;line-height:1.45;}
+  .ap-planmsg{font-size:13px;color:var(--emerald);background:#E7F1EA;border:1px solid #BFD9C9;border-radius:8px;padding:8px 12px;margin:0 0 12px;}
+  .ap-planmsg.err{color:var(--clay);background:#FBEAE8;border-color:#E4B9B3;}
+  .ap-inherit-note{font-size:13px;color:var(--ink);background:#EEF2F8;border:1px solid #CBD6E6;border-radius:10px;padding:10px 12px;margin:-8px 0 16px;line-height:1.45;}
+  .ap-planlegend{display:flex;justify-content:flex-end;gap:10px;padding:2px 26px 4px 0;font-size:11px;color:var(--ink-soft);font-weight:600;}
+  .ap-planlegend span:first-child{width:84px;text-align:right;}
+  .ap-planlegend span:last-child{width:118px;text-align:right;}
+  .ap-actual{width:84px;text-align:right;font-size:12.5px;color:var(--ink-soft);flex:none;}
+  .ap-amtwrap.inherited input{color:var(--ink-soft);font-style:italic;}
+  .ap-amtwrap input::placeholder{color:#A4ABB7;}
+  @media(max-width:600px){
+    .ap-periodctl{align-items:stretch;width:100%;}
+    .ap-period{justify-content:space-between;}
+    .ap-presets{justify-content:flex-start;}
+    .ap-actual{width:64px;font-size:11.5px;}
+    .ap-planlegend span:first-child{width:64px;}
+  }
 
   /* statement import */
   .ap-iobtn.strong{background:var(--navy);color:var(--paper2);border-color:var(--navy);}
