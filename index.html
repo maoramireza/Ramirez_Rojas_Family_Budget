@@ -465,7 +465,7 @@ window.addEventListener("error", function(e){
     .replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, "").replace(/^[a-z]\s+|\s+[a-z]$/g, "").replace(/^(?:CCD|PPD|WEB)\s+|\s+(?:CCD|PPD|WEB)$/g, "").trim();
   const looksReceipt = (text) => /\btotal\b/i.test(text);
 
-  function parsePhotoList(text, pi, todayIso) {
+  function parsePhotoList(text, pi, todayIso, card) {
     const lines = text.split(/\n/).map((t) => t.trim()).filter(Boolean);
     const rows = []; let curDate = null, pendingDesc = null;
     lines.forEach((line, li) => {
@@ -484,15 +484,20 @@ window.addEventListener("error", function(e){
       // a date on the row wins, then the date header above it; only look below when there's no header yet
       let date = (d && d.iso) || curDate;
       if (!date) { const nx = lines[li + 1]; const nd = nx && !moneyTokens(nx).length ? findDate(nx, todayIso) : null; date = (nd && nd.iso) || todayIso; }
-      const out = mt.neg || !INFLOW_RX.test(desc);
-      rows.push({ id: `p${pi}-${rows.length}`, photo: pi, fromPhoto: true, desc: desc || "Transaction", amount: out ? -mt.cents : mt.cents, date, postDate: date, section: out ? "withdrawals" : "deposits" });
+      const out = card ? (mt.signed ? !mt.neg : !CARD_IN_RX.test(desc)) : (mt.neg || !INFLOW_RX.test(desc));
+      rows.push({ id: `p${pi}-${rows.length}`, photo: pi, fromPhoto: true, photoCard: !!card, desc: desc || "Transaction", amount: out ? -mt.cents : mt.cents, date, postDate: date, section: out ? "withdrawals" : "deposits" });
       pendingDesc = null;
     });
     return rows;
   }
   const BLOCK_HEAD = /^(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})|Processing|Pending)\b\s*/i;
+  // Credit card screens flip the signs: purchases show with no sign (they add to what you owe), payments/refunds show "-".
+  const CARD_RX = /credit card|statement balance|minimum payment|available credit|visa|mastercard|amex|american express|customized cash|travel rewards|premium rewards|unlimited cash|cash rewards/i;
+  const DEBIT_RX = /available balance|checking|savings|debit|tarjeta d[eé]bito/i;
+  const detectAcctType = (text) => (CARD_RX.test(text) && !DEBIT_RX.test(text) ? "card" : "debit");
+  const CARD_IN_RX = /payment|thank you|refund|return|credit|cash ?back|reversal/i;
   const isBlockLayout = (text) => text.split(/\n/).filter((l) => BLOCK_HEAD.test(l.trim())).length >= 2;
-  function parsePhotoBlocks(text, pi, todayIso) {
+  function parsePhotoBlocks(text, pi, todayIso, card) {
     const blocks = [];
     text.split(/\n/).map((t) => t.trim()).filter(Boolean).forEach((line) => {
       const h = line.match(BLOCK_HEAD);
@@ -519,18 +524,20 @@ window.addEventListener("error", function(e){
       let date = b.date;
       const emb = desc.match(/\b(\d{2})\/(\d{2})\b/);   // purchase date inside the description (e.g. "09/06 PURCHASE")
       if (emb && validMD(+emb[1], +emb[2])) { const d = inferYear(+emb[1], +emb[2], b.date, 0); const gap = dayDiff(b.date, d); if (gap >= 0 && gap <= 20) date = d; }
-      const signKnown = !!(amt && amt.signed);
-      const out = amt ? (signKnown ? amt.neg : !INFLOW_RX.test(desc)) : true;
+      // Debit: "-" is money out. Card: no sign is a purchase (money out), "-" is a payment or refund (money in).
+      const signKnown = !!(amt && amt.signed);   // card purchases have no sign by design, but so does a dropped "-": let balances confirm
+      const out = !amt ? true : card ? (amt.signed ? !amt.neg : !CARD_IN_RX.test(desc)) : (amt.signed ? amt.neg : !INFLOW_RX.test(desc));
       const amount = amt ? (out ? -amt.cents : amt.cents) : 0;
       rows.push({ id: `p${pi}-${rows.length}`, photo: pi, fromPhoto: true, desc, amount, balance: bal ? bal.cents : null, needsAmount: !amt,
-        signKnown, unsure, date, postDate: b.date, section: amount > 0 ? "deposits" : "withdrawals" });
+        signKnown, unsure, photoCard: !!card, date, postDate: b.date, section: amount > 0 ? "deposits" : "withdrawals" });
     });
     // Rows are newest first, so: this row's balance = newer row's balance - newer row's amount,
     // and this row's amount = its balance - the older row's balance. Use that to sort out roles, signs and gaps.
+    const flip = card ? -1 : 1;   // debit: spending lowers the balance; card: spending raises what you owe
     const eff = [];
     for (let k = 0; k < rows.length; k++) {
       const r = rows[k], nw = rows[k - 1];
-      const fromNewer = nw && eff[k - 1] != null && !nw.needsAmount && (nw.signKnown || nw.fromBalance || nw.signFixed) ? eff[k - 1] - nw.amount : null;
+      const fromNewer = nw && eff[k - 1] != null && !nw.needsAmount && (nw.signKnown || nw.fromBalance || nw.signFixed) ? eff[k - 1] - flip * nw.amount : null;
       if (r.unsure && r.balance == null && fromNewer != null && Math.abs(r.amount) === fromNewer && Math.abs(r.amount) !== Math.abs(fromNewer - (rows[k + 1] && rows[k + 1].balance || 0))) {
         r.balance = fromNewer; r.amount = 0; r.needsAmount = true;                   // the lone figure was the balance
       }
@@ -539,7 +546,7 @@ window.addEventListener("error", function(e){
     for (let k = 0; k < rows.length - 1; k++) {
       const r = rows[k];
       if (eff[k] == null || eff[k + 1] == null) continue;
-      const expected = eff[k] - eff[k + 1];
+      const expected = flip * (eff[k] - eff[k + 1]);
       if (!expected) continue;
       if (r.needsAmount) { r.amount = expected; r.needsAmount = false; r.fromBalance = true; }
       else if (!r.signKnown && expected === -r.amount) { r.amount = expected; r.signFixed = true; }   // sign was lost; balances say which way
@@ -547,7 +554,8 @@ window.addEventListener("error", function(e){
       else if (r.amount !== expected) r.amountHint = expected;
       r.section = r.amount > 0 ? "deposits" : "withdrawals";
     }
-    rows.forEach((r) => { if (!r.signKnown && !r.signFixed && !r.fromBalance && !r.needsAmount) r.signGuess = true; });
+    // on a card screen an unsigned amount is a purchase by design, so only debit rows get the "sign unreadable" note
+    rows.forEach((r) => { if (!card && !r.signKnown && !r.signFixed && !r.fromBalance && !r.needsAmount) r.signGuess = true; });
     // One misread balance throws off two neighbouring checks by equal and opposite amounts: that's the balance, not the amounts.
     for (let k = 0; k < rows.length - 1; k++) {
       const a = rows[k], b = rows[k + 1];
@@ -571,9 +579,11 @@ window.addEventListener("error", function(e){
     return [{ id: `p${pi}-0`, photo: pi, fromPhoto: true, desc: store || "Receipt", amount: -total, date: dt, postDate: dt, section: "withdrawals" }];
   }
   // texts: OCR text per photo. modes: per photo "auto" | "list" | "receipt".
-  function parsePhotos(texts, modes, todayIso) {
+  function parsePhotos(texts, modes, todayIso, types) {
     const used = texts.map((t, i) => (modes && modes[i] && modes[i] !== "auto") ? modes[i] : (looksReceipt(t) ? "receipt" : "list"));
-    let rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso) : isBlockLayout(t) ? parsePhotoBlocks(t, i, todayIso) : parsePhotoList(t, i, todayIso));
+    const acct = texts.map((t, i) => (types && types[i] && types[i] !== "auto") ? types[i] : detectAcctType(t));
+    let rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso)
+      : isBlockLayout(t) ? parsePhotoBlocks(t, i, todayIso, acct[i] === "card") : parsePhotoList(t, i, todayIso, acct[i] === "card"));
     // Overlapping screenshots repeat rows. A row counts once when it also appears in an EARLIER photo;
     // identical rows inside the same photo are separate real purchases (two $5.25 coffees) and are all kept.
     const seenIn = new Map();
@@ -596,7 +606,7 @@ window.addEventListener("error", function(e){
     const dates = rows.map((r) => r.date).sort();
     let h = 5381; const all = texts.join("\n"); for (let i = 0; i < all.length; i++) h = ((h << 5) + h + all.charCodeAt(i)) | 0;
     return { bank: "photo", kind: "photo", photo: true, label: texts.length > 1 ? `${texts.length} photos` : "Photo", last4: null,
-      start: dates[0] || todayIso, end: dates[dates.length - 1] || todayIso, rows, holders: [], errors: [], modes: used,
+      start: dates[0] || todayIso, end: dates[dates.length - 1] || todayIso, rows, holders: [], errors: [], modes: used, acctTypes: acct,
       fingerprint: "photo:" + (h >>> 0).toString(16) + ":" + texts.length };
   }
 
@@ -741,7 +751,7 @@ window.addEventListener("error", function(e){
     const cands = rows.filter((r) => !merged.has(r.id) && (r.amount !== 0 || r.needsAmount)).map((r) => {
       const mi = merchantInfo(r.desc);
       const c = { id: r.id, date: r.date, desc: r.desc, amount: r.amount, dir: r.amount < 0 || r.needsAmount ? "out" : "in",
-        needsAmount: !!r.needsAmount, amountHint: r.amountHint || null, fromBalance: !!r.fromBalance, signGuess: !!r.signGuess,
+        needsAmount: !!r.needsAmount, amountHint: r.amountHint || null, fromBalance: !!r.fromBalance, signGuess: !!r.signGuess, photoCard: !!r.photoCard,
         merchant: mi.name, key: mi.ambiguous ? null : mi.key, memo: mi.memo || null, person: mi.person || null, fromPhoto: !!r.fromPhoto, fx: r.fx || null, feeMerged: r.feeMerged || 0,
         orderTok: orderToks(r.desc),
         section: r.section, kind: null, skipReason: null, type: null, category: null, source: null,
@@ -763,6 +773,7 @@ window.addEventListener("error", function(e){
     const d = c.desc;
 
     if (RX.ktc.test(d)) return setSkip(c, "Keep the Change round-up");
+    if (c.photoCard && isIn && /\bpayment\b|thank you/i.test(d) && !RX.refund.test(d)) return setSkip(c, "Card payment");
     if (RX.cashback.test(d)) return setSkip(c, "Cash back (kept off)");
     if (isIn && RX.interestEarned.test(d)) return setSkip(c, "Interest (kept off)");
     if (A === "card" && c.section === "credits" && /^PAYMENT\b/i.test(d) && !counterpartyOf(d)) return setSkip(c, "Card payment");
@@ -947,7 +958,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-24 (photos v3)";
+const APP_VERSION = "2026-09-24 (photos v4, cards)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2492,8 +2503,8 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
     setErrors([`${prior.kind === "photo" ? "These photos were" : "This statement was"} already imported on ${prior.at.slice(0, 10)} by ${prior.by}. To import again, undo that import first under History.`]);
     setView("error"); return true;
   };
-  const showPhotos = (texts, modes) => {
-    const st = SI.parsePhotos(texts, modes, localToday());
+  const showPhotos = (texts, modes, types) => {
+    const st = SI.parsePhotos(texts, modes, localToday(), types);
     if (!st.rows.length) { setErrors(["Couldn't find any amounts in the photo. Try a sharper picture, or crop it to just the transactions."]); setView("error"); return; }
     if (alreadyImported(st.fingerprint)) return;
     setStmt(st); setView("review");
@@ -2672,9 +2683,19 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                     <span>{photoTexts.length > 1 ? `Photo ${pi + 1}` : "This photo"} read as</span>
                     <div className="ap-seg">
                       {[["list", "Transaction list"], ["receipt", "Receipt"]].map(([m, l]) => (
-                        <button key={m} className={stmt.modes[pi] === m ? "on" : ""} onClick={() => { if (stmt.modes[pi] !== m) { const modes = stmt.modes.slice(); modes[pi] = m; setEdits({}); setOverrides({}); showPhotos(photoTexts, modes); } }}>{l}</button>
+                        <button key={m} className={stmt.modes[pi] === m ? "on" : ""} onClick={() => { if (stmt.modes[pi] !== m) { const modes = stmt.modes.slice(); modes[pi] = m; setEdits({}); setOverrides({}); showPhotos(photoTexts, modes, stmt.acctTypes); } }}>{l}</button>
                       ))}
                     </div>
+                    {stmt.modes[pi] === "list" && (
+                      <>
+                        <span>from</span>
+                        <div className="ap-seg">
+                          {[["debit", "Debit / checking"], ["card", "Credit card"]].map(([t, l]) => (
+                            <button key={t} className={stmt.acctTypes[pi] === t ? "on" : ""} onClick={() => { if (stmt.acctTypes[pi] !== t) { const types = stmt.acctTypes.slice(); types[pi] = t; setEdits({}); setOverrides({}); showPhotos(photoTexts, stmt.modes, types); } }}>{l}</button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2922,7 +2943,9 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent,
         <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.needsAmount ? "?" : (c.amount < 0 ? "−" : "+") + centsFmt(c.amount)}</span>
       </div>
       {c.fromPhoto ? <PhotoEdit c={c} editRow={editRow} /> : <div className="ap-imp-raw" title={c.desc}>{c.desc}</div>}
-      {c.amountHint && <div className="ap-imp-check">The balances on the screenshot say this should be {fmt2(Math.abs(c.amountHint) / 100)}. <button className="ap-imp-link" onClick={() => editRow(c.id, { abs: Math.abs(c.amountHint), dir: c.amountHint < 0 ? "out" : "in" })}>Use {fmt2(Math.abs(c.amountHint) / 100)}</button></div>}
+      {c.amountHint && <div className="ap-imp-check">{Math.abs(c.amountHint) === Math.abs(c.amount)
+        ? `The balances on the screenshot say this was money ${c.amountHint < 0 ? "out" : "in"}.`
+        : `The balances on the screenshot say this should be ${fmt2(Math.abs(c.amountHint) / 100)}.`} <button className="ap-imp-link" onClick={() => editRow(c.id, { abs: Math.abs(c.amountHint), dir: c.amountHint < 0 ? "out" : "in" })}>{Math.abs(c.amountHint) === Math.abs(c.amount) ? `Make it money ${c.amountHint < 0 ? "out" : "in"}` : `Use ${fmt2(Math.abs(c.amountHint) / 100)}`}</button></div>}
       {c.fromBalance && <div className="ap-imp-why">Amount worked out from the running balances on the screenshot.</div>}
       {c.signGuess && <div className="ap-imp-why">The + / − sign wasn't readable, so this is assumed to be money {c.dir === "out" ? "out" : "in"}. Tap the direction button if that's wrong.</div>}
       {(c.fx || c.feeMerged > 0) && <div className="ap-imp-why">{c.fx}{c.fx && c.feeMerged ? " · " : ""}{c.feeMerged > 0 && `includes ${fmt2(c.feeMerged / 100)} foreign fee`}</div>}
