@@ -282,7 +282,7 @@ window.addEventListener("error", function(e){
         const postDate = iso(2000 + +cur.yy, +cur.mm, +cur.dd);
         const row = { section, desc: cur.desc.replace(/\s+/g, " ").trim(), printed, amount: printed, postDate, date: postDate, page: cur.page };
         const emb = row.desc.match(/^(?:MOBILE PURCHASE|PURCHASE REFUND|PURCHASE|CHECKCARD|PMNT SENT|ATM WITHDRAWAL)\s+(\d{2})(\d{2})\b/i)
-          || row.desc.match(/\b(\d{2})\/(\d{2})\s+#\d+\s+MOBILE PURCHASE\b/i);
+          || row.desc.match(/\b(\d{2})\/(\d{2})\s+#\d+\s+(?:MOBILE\s+)?PURCHASE\b/i);
         if (emb && validMD(+emb[1], +emb[2])) {
           const d = inferYear(+emb[1], +emb[2], postDate, 0);
           if (dayDiff(postDate, d) >= 0 && dayDiff(postDate, d) <= 20) row.date = d;
@@ -363,6 +363,7 @@ window.addEventListener("error", function(e){
       .replace(/\*/g, " ")
       .replace(/\bRECURRING\b/g, " ");
     let toks = t.split(/\s+/).filter(Boolean)
+      .filter((w) => /[A-Z0-9]/.test(w))                                // stray punctuation like a lone "#"
       .filter((w) => !/^\d+$/.test(w))                                 // bare numbers
       .filter((w) => !(/\d/.test(w) && /[A-Z]/.test(w) && w.length >= 6)); // order ids like 5H96A99Y2
     if (toks.length > 1 && STATES.has(toks[toks.length - 1])) toks.pop();
@@ -384,6 +385,10 @@ window.addEventListener("error", function(e){
       const key = cleanTokens(m[1] + " " + m[2]).join(" ");
       return { key, name: titleCase(cleanTokens(m[1]).join(" ")) };
     }
+    // "ALDI 71046 07/05 #000913500 MOBILE PURCHASE 608 QUINCE ORCHAR ..." — the store name is the part before the date;
+    // what follows "PURCHASE" is sometimes the store's street address.
+    const pre = u.match(/^(.+?)\s+\d{2}\/\d{2}\s+#\d+\s+(?:MOBILE\s+)?PURCHASE\b/);
+    if (pre) { const pt = cleanTokens(pre[1]); if (pt.length) return { key: pt.join(" "), name: titleCase(pt.slice(0, 4).join(" ")) }; }
     let body = u;
     const mp = u.match(/MOBILE PURCHASE\s+(?!\d{4}\b)(.+)$/);                // "BEST BUY #293 08/08 #0007 MOBILE PURCHASE BEST BUY #293 ..."
     if (mp) body = mp[1];
@@ -436,6 +441,7 @@ window.addEventListener("error", function(e){
     return null;
   }
   function acctLabel(id, kind, reg) {
+    if (reg && reg.nickname) return reg.nickname + (/^\d{4}$/.test(id) ? ` ····${id}` : "");
     if (reg && reg.label) return reg.label + (/^\d{4}$/.test(id) ? ` ····${id}` : "");
     const k = kind === "card" ? "Card" : kind === "savings" ? "Savings" : "Checking";
     return /^\d{4}$/.test(id) ? `${k} ····${id}` : titleCase(id.replace(/-/g, " "));
@@ -634,7 +640,7 @@ window.addEventListener("error", function(e){
       if (c.fx) noteParts.push(c.fx);
       if (c.feeMerged) noteParts.push(`incl. ${fmtC(c.feeMerged)} foreign fee`);
       const note = noteParts.filter(Boolean).join(" · ");
-      const src = { acct: st.last4, key: c.key || undefined, tok: c.orderTok.length ? c.orderTok : undefined };
+      const src = { acct: st.last4, key: c.key || undefined, tok: c.orderTok.length ? c.orderTok : undefined, raw: c.desc };
       if (c.kind === "expense" || c.kind === "income") {
         entries.push({ id: makeId(), date: c.date, type: c.type, category: c.category, amount: Math.abs(c.amount) / 100, note,
           bucket: c.type === "Expenses" && c.bucket ? c.bucket : undefined, importId, src });
@@ -691,7 +697,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-23 (paychecks)";
+const APP_VERSION = "2026-09-23 (backups)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -712,6 +718,7 @@ function App({ session, onSignOut }) {
   const openMonth = (key) => setRange({ from: monthStart(key), to: monthEnd(key) });
   const [tab, setTab] = useState("dashboard");
   const [importOpen, setImportOpen] = useState(false);
+  const [backupsOpen, setBackupsOpen] = useState(false);
   const [showLogoutWarning, setShowLogoutWarning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const firstSave = useRef(true);
@@ -849,6 +856,7 @@ function App({ session, onSignOut }) {
     const filled = targets.filter((k) => own.includes(k) && TYPES.some((t) => base.categories[t].some((c) => base.plan[t]?.[c]?.[k])));
     if (filled.length && !confirm(`${filled.map(monthLabel).join(", ")} already ${filled.length > 1 ? "have budgets" : "has a budget"}. Replace with ${monthLabel(srcKey)}'s amounts?`))
       return { ok: false, text: "Nothing was copied." };
+    backupBefore(`Before copying ${monthLabel(srcKey)}`);
     update((s) => {
       if (targets.length > 1) ownMonth(s, addMonths(targets[targets.length - 1], 1));
       targets.forEach((k) => {
@@ -859,7 +867,7 @@ function App({ session, onSignOut }) {
     });
     return { ok: true, text: `Copied ${values.length} amounts from ${monthLabel(srcKey)} into ${targets.length > 1 ? targets.length + " months" : monthLabel(targets[0])}.` };
   };
-  const resetPlan = () => { if (!confirm("Reset all categories and budget amounts to the original plan? Your logged transactions are kept.")) return;
+  const resetPlan = () => { if (!confirm("Reset all categories and budget amounts to the original plan? Your logged transactions are kept.")) return; backupBefore("Before resetting the plan");
     update((s)=>{ s.categories = structuredClone(BASELINE.categories); s.plan = structuredClone(BASELINE.plan); s.planMonths = []; }); };
   const addEntry = (e) => update((s)=> s.entries.unshift(e));
   const editEntry = (id, patch) => update((s)=> { s.entries = s.entries.map((x)=>x.id===id?{...x,...patch}:x); });
@@ -877,7 +885,8 @@ function App({ session, onSignOut }) {
     await doSave(next);
     return { ok: JSON.stringify(next) === lastSavedRef.current };
   };
-  const commitImport = ({ stmt, importId, built, answers, extraCats, by }) => commit((s) => {
+  const commitImport = async (args) => { await backupBefore(`Before importing ${args.stmt.label} ····${args.stmt.last4}`); return commitImportNow(args); };
+  const commitImportNow = ({ stmt, importId, built, answers, extraCats, by }) => commit((s) => {
     const imp = { ...EMPTY_IMPORTER, ...(s.importer || {}) };
     if (imp.imports.some((i) => i.fp === stmt.fingerprint)) return false;
     TYPES.forEach((t) => (extraCats[t] || []).forEach((name) => {
@@ -895,7 +904,8 @@ function App({ session, onSignOut }) {
       at: new Date().toISOString(), by, count: built.entries.length, removed }, ...imp.imports];
     s.importer = imp;
   });
-  const undoImport = (id) => commit((s) => {
+  const undoImport = async (id) => { await backupBefore("Before undoing an import"); return undoImportNow(id); };
+  const undoImportNow = (id) => commit((s) => {
     const imp = { ...EMPTY_IMPORTER, ...(s.importer || {}) };
     const rec = imp.imports.find((i) => i.id === id); if (!rec) return false;
     const have = new Set(s.entries.map((e) => e.id));
@@ -904,6 +914,57 @@ function App({ session, onSignOut }) {
     s.importer = imp;
   });
   const setSetting = (k, v) => update((s) => { s.settings = { ...(s.settings || {}), [k]: v }; });
+  /* ---- backups: full copies stored as extra rows beside the live budget; live sync only watches id "family" ---- */
+  const myName = NAMES[(session?.user?.email||"").toLowerCase()] || session?.user?.email || "someone";
+  const writeBackup = async (st, id, label) => {
+    const snap = { ...st, __backup: { label, at: new Date().toISOString(), by: myName, entries: (st.entries||[]).length } };
+    const { error } = await sb.from("budgets").upsert({ id, state: snap, updated_at: new Date().toISOString(), updated_by: session?.user?.id }, { onConflict: "id" });
+    if (error) throw error;
+  };
+  // Rolling slots: one per day of the month (about a month of daily copies) plus 10 "before a change" copies.
+  const backupBefore = async (label) => {
+    const st = stateRef.current; if (!st) return;
+    try {
+      const { data } = await sb.from("budgets").select("id,updated_at").like("id", "backup-op-%");
+      const used = new Map((data || []).map((r) => [r.id, r.updated_at || ""]));
+      let id = null;
+      for (let k = 0; k < 10; k++) if (!used.has(`backup-op-${k}`)) { id = `backup-op-${k}`; break; }
+      if (!id) id = [...used.entries()].sort((a, b) => a[1].localeCompare(b[1]))[0][0];
+      await writeBackup(st, id, label);
+    } catch (e) { console.warn("Backup failed", e); }
+  };
+  const backupDaily = async (st) => {
+    const d = localToday(), id = `backup-day-${d.slice(8)}`;
+    try {
+      const { data } = await sb.from("budgets").select("state").eq("id", id).maybeSingle();
+      const at = data && data.state && data.state.__backup && data.state.__backup.at;
+      if (at && new Date(at).toDateString() === new Date().toDateString()) return;
+      await writeBackup(st, id, "Daily copy");
+    } catch (e) { console.warn("Daily backup failed", e); }
+  };
+  const listBackups = async () => {
+    const { data, error } = await sb.from("budgets").select("id,updated_at,meta:state->__backup").like("id", "backup-%");
+    if (error) throw error;
+    return (data || []).map((r) => ({ id: r.id, at: (r.meta && r.meta.at) || r.updated_at, label: (r.meta && r.meta.label) || "Copy",
+      by: r.meta && r.meta.by, entries: r.meta && r.meta.entries })).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  };
+  const restoreBackup = async (id) => {
+    const { data, error } = await sb.from("budgets").select("state").eq("id", id).maybeSingle();
+    if (error || !data || !data.state) return false;
+    await backupBefore("Before restoring a backup");
+    const { __backup, ...snap } = data.state;
+    stateRef.current = snap; setState(snap);
+    await doSave(snap);
+    return JSON.stringify(snap) === lastSavedRef.current;
+  };
+  const downloadCopy = () => {
+    const blob = new Blob([JSON.stringify(stateRef.current, null, 1)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ramirez-rojas-budget-${localToday()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const dailyDone = useRef(false);
+  useEffect(() => { if (loaded && state && !dailyDone.current) { dailyDone.current = true; backupDaily(state); } }, [loaded]);
+
   const updateImporter = (fn) => update((s) => { s.importer = { ...EMPTY_IMPORTER, ...(s.importer || {}) }; fn(s.importer); });
 
   /* ---- buckets ---- */
@@ -919,6 +980,7 @@ function App({ session, onSignOut }) {
   const endYear = async () => {
     const yr = year;
     if (!confirm(`Archive the ${yr} budget and start ${yr+1} fresh?\n\nThis is reversible — you can Restore ${yr} anytime from this same section. Your logged transactions are never deleted.`)) return;
+    await backupBefore("Before archiving the year");
     try {
       await window.saveArchive(yr, state);
       update((s)=>{ TYPES.forEach((type)=>{ s.plan[type]={}; s.categories[type].forEach((c)=>{ s.plan[type][c]={}; }); }); });
@@ -932,6 +994,7 @@ function App({ session, onSignOut }) {
     const a = archives.find((x)=>x.year===yr);
     if (!a || !a.state) { alert("No archived data found for " + yr); return; }
     if (!confirm(`Restore ${yr}? This brings back ${yr}'s budgeted amounts and categories. Your logged transactions are kept as-is.`)) return;
+    await backupBefore(`Before restoring ${yr}`);
     update((s)=>{
       if (a.state.plan) s.plan = structuredClone(a.state.plan);
       if (a.state.categories) s.categories = structuredClone(a.state.categories);
@@ -961,6 +1024,7 @@ function App({ session, onSignOut }) {
         </div>
       )}
 
+      {backupsOpen && <BackupsSheet listBackups={listBackups} saveNow={() => backupBefore("Saved by hand")} restoreBackup={restoreBackup} downloadCopy={downloadCopy} onClose={() => setBackupsOpen(false)} />}
       {importOpen && (
         <ImportSheet state={state} userName={NAMES[(session?.user?.email||"").toLowerCase()] || session?.user?.email || "someone"}
           commitImport={commitImport} undoImport={undoImport} updateImporter={updateImporter} onClose={()=>setImportOpen(false)}/>
@@ -1016,7 +1080,7 @@ function App({ session, onSignOut }) {
         )}
 
         <footer className="ap-foot">
-          Auto-saves to your shared family budget and syncs live across devices · {state.entries.length} records logged · version {APP_VERSION}
+          Auto-saves to your shared family budget and syncs live across devices · {state.entries.length} records logged · version {APP_VERSION} · <button className="ap-footlink" onClick={()=>setBackupsOpen(true)}>Backups</button>
         </footer>
       </div>
     </div>
@@ -1089,6 +1153,41 @@ function countsDate(e, state) {
   return +e.date.slice(8) > +monthEnd(key).slice(8) - n ? monthStart(addMonths(key, 1)) : e.date;
 }
 const countsMonth = (e, state) => (countsDate(e, state) || "").slice(0, 7);
+
+/* ================= DATA COMPLETENESS =================
+   Once an account's statements are being imported, a month is complete only when that account's statements
+   cover every day of it (up to today). Months before an account's first statement aren't judged. */
+function statementGaps(state, key) {
+  const imp = state.importer;
+  if (!imp || !imp.imports || !imp.imports.length) return [];
+  const today = localToday();
+  const ms = monthStart(key);
+  if (ms > today) return [];
+  const me = monthEnd(key) < today ? monthEnd(key) : today;
+  const byAcct = {};
+  imp.imports.forEach((i) => { (byAcct[i.acct] = byAcct[i.acct] || []).push(i); });
+  const gaps = [];
+  Object.entries(byAcct).forEach(([acct, raw]) => {
+    const list = raw.slice().sort((a, b) => a.start.localeCompare(b.start));
+    let cursor = ms > list[0].start ? ms : list[0].start;
+    if (cursor > me) return;
+    for (const i of list) {
+      if (i.end < cursor) continue;
+      if (i.start > me) break;
+      if (i.start > cursor) gaps.push({ acct, from: cursor, to: addDaysISO(i.start, -1) });
+      cursor = addDaysISO(i.end, 1);
+      if (cursor > me) break;
+    }
+    if (cursor <= me) gaps.push({ acct, from: cursor, to: me });
+  });
+  return gaps;
+}
+function gapLabel(state, g) {
+  const reg = (state.importer && state.importer.accounts && state.importer.accounts[g.acct]) || {};
+  const name = SI.acctLabel(g.acct, reg.kind, reg);
+  return `${name}: ${g.from === g.to ? shortDate(g.from) : `${shortDate(g.from)} – ${shortDate(g.to)}`}`;
+}
+
 
 /* ================= BUDGETS REPEAT =================
    A month is "budgeted" once it has its own amounts (or was edited/copied into).
@@ -1171,6 +1270,19 @@ function Dashboard({ state, period, addEntry, deleteEntry }) {
   const usedPct = expBudget > 0 ? (spentTotal / expBudget) * 100 : (spentTotal > 0 ? 120 : 0);
   const remaining = expBudget - spentTotal;
   const n = period.months.length;
+  const monthGaps = period.months.flatMap((k) => statementGaps(state, k));
+  // spending pace: how much of the period has passed (only while today is inside it)
+  const today = localToday();
+  const elapsed = period.inRange(today) ? (daysBetween(period.from, today) + 1) / (daysBetween(period.from, period.to) + 1) : null;
+  // "everyday" categories have frequent transactions; one-off bills like the mortgage would give false alarms
+  const variableCats = useMemo(() => {
+    const since = monthStart(addMonths(period.from.slice(0, 7), -3)), cnt = {};
+    state.entries.forEach((e) => { if (e.type === "Expenses" && e.date >= since && e.date < period.from) cnt[e.category] = (cnt[e.category] || 0) + 1; });
+    monthEntries.forEach((e) => { if (e.type === "Expenses") cnt[e.category] = (cnt[e.category] || 0) + 0.5; });
+    return new Set(Object.keys(cnt).filter((c) => cnt[c] >= 6));
+  }, [state, period]);
+  const everyday = envelopes.filter((e) => variableCats.has(e.c) && e.budget > 0);
+  const evBudget = everyday.reduce((a, e) => a + e.budget, 0), evSpent = everyday.reduce((a, e) => a + e.spent, 0);
 
   return (
     <>
@@ -1184,6 +1296,12 @@ function Dashboard({ state, period, addEntry, deleteEntry }) {
         <p className="ap-rangenote">Showing <b>{period.label}</b>. Budgets count whole months ({n === 1 ? monthLabel(period.months[0]) : `${n} months, ${monthLabel(period.months[0])} to ${monthLabel(period.months[n - 1])}`}); spending counts only the dates in the range.</p>
       )}
 
+      {monthGaps.length > 0 && (
+        <div className="ap-partialnote">
+          <b>{period.label} isn't complete yet.</b> Not imported: {monthGaps.slice(0, 3).map((g) => gapLabel(state, g)).join("; ")}{monthGaps.length > 3 ? `; and ${monthGaps.length - 3} more` : ""}. Income and spending from those dates aren't counted yet.
+        </div>
+      )}
+
       <div className="ap-overall">
         <div className="ap-overall-top">
           <span>{usedPct.toFixed(0)}% of budget used</span>
@@ -1193,6 +1311,10 @@ function Dashboard({ state, period, addEntry, deleteEntry }) {
           <div className="ap-fill" style={{ width: Math.min(usedPct, 100) + "%",
             background: usedPct > 100 ? "var(--clay)" : usedPct > 85 ? "var(--navy)" : "var(--emerald)" }} />
         </div>
+        {elapsed !== null && evBudget > 0 && (() => {
+          const used = evSpent / evBudget, ahead = used > elapsed + 0.08;
+          return <div className={"ap-note ap-pacenote" + (ahead ? " warn" : "")}>Everyday spending ({everyday.length === 1 ? everyday[0].c : `${everyday.length} categories`}): <b>{Math.round(used * 100)}%</b> spent with <b>{Math.round(elapsed * 100)}%</b> of {period.label} gone. {ahead ? "Spending is running ahead of the calendar." : "On pace."}</div>;
+        })()}
         {savBudget > 0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget - expBudget - savBudget)}</div>}
       </div>
 
@@ -1208,7 +1330,7 @@ function Dashboard({ state, period, addEntry, deleteEntry }) {
           <Envelope key={e.c} env={e}
             items={monthEntries.filter((x) => x.type === "Expenses" && x.category === e.c)}
             defDate={period.defaultDate} addEntry={addEntry}
-            onDelete={deleteEntry} buckets={buckets} />
+            onDelete={deleteEntry} buckets={buckets} elapsed={elapsed} everyday={variableCats.has(e.c)} periodLabel={period.label} />
         ))}
         {envelopes.length === 0 && <p className="ap-loading">No expense budget or spending for {period.label}. Set one in Planning.</p>}
         {envelopes.length > 0 && envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).length === 0 && <p className="ap-loading">No expense category matches "{q}".</p>}
@@ -1230,7 +1352,7 @@ function Stat({ label, val, color, hero }) {
   );
 }
 
-function Envelope({ env, items, defDate, addEntry, onDelete, buckets }) {
+function Envelope({ env, items, defDate, addEntry, onDelete, buckets, elapsed, everyday, periodLabel }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [amt, setAmt] = useState("");
@@ -1253,7 +1375,11 @@ function Envelope({ env, items, defDate, addEntry, onDelete, buckets }) {
           {env.budget>0 ? (over?fmt(Math.abs(env.remaining))+" over":fmt(env.remaining)+" left") : "unbudgeted"}
         </span>
       </div>
-      <div className="ap-track"><div className="ap-fill" style={{width:Math.min(pct,100)+"%",background:color}}/></div>
+      <div className="ap-track ap-paced"><div className="ap-fill" style={{width:Math.min(pct,100)+"%",background:color}}/>
+        {elapsed!==null && elapsed!==undefined && env.budget>0 && <i className="ap-today" style={{left:(elapsed*100)+"%"}} title="Today"/>}</div>
+      {everyday && elapsed && env.budget>0 && !over && env.spent/env.budget > elapsed+0.1 && env.spent/elapsed > env.budget && (
+        <div className="ap-pace">At this pace about {fmt(env.spent/elapsed)} by the end of {periodLabel}, {fmt(env.spent/elapsed-env.budget)} over.</div>
+      )}
       <div className="ap-env-foot">
         <span className="mono">{fmt(env.spent)} <span className="dim">{env.budget>0?"of "+fmt(env.budget):"no budget"}</span></span>
         <button className="ap-envadd" onClick={()=>setAdding(!adding)}>{adding?"Cancel":"+ Add"}</button>
@@ -1309,10 +1435,16 @@ function MiniPanel({ title, rows, planAmt, spent, accent, verb }) {
   );
 }
 
-function Combo({ value, onChange, options, placeholder }) {
+const topUsed = (state, type, n = 6) => {
+  const cnt = {};
+  state.entries.forEach((e) => { if (e.type === type && e.category) cnt[e.category] = (cnt[e.category] || 0) + 1; });
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, n).map(([c]) => c);
+};
+function Combo({ value, onChange, options, placeholder, top }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const filtered = options.filter((o) => o.toLowerCase().includes(q.toLowerCase()));
+  const lead = !q && top ? top.filter((o) => options.includes(o)) : [];
+  const filtered = options.filter((o) => o.toLowerCase().includes(q.toLowerCase()) && !lead.includes(o));
   return (
     <div className="ap-combo">
       <input type="text" value={open ? q : value} placeholder={placeholder}
@@ -1322,8 +1454,11 @@ function Combo({ value, onChange, options, placeholder }) {
         onKeyDown={(e)=>{ if(e.key==="Enter" && filtered[0]){ onChange(filtered[0]); setOpen(false); e.target.blur(); } if(e.key==="Escape"){ setOpen(false); e.target.blur(); } }}/>
       {open && (
         <ul className="ap-combo-list">
+          {lead.length>0 && <li className="hd">Most used</li>}
+          {lead.map((o)=>(<li key={"top-"+o} onMouseDown={(e)=>{ e.preventDefault(); onChange(o); setOpen(false); }}>{o}</li>))}
+          {lead.length>0 && filtered.length>0 && <li className="hd">All categories</li>}
           {filtered.map((o)=>(<li key={o} onMouseDown={(e)=>{ e.preventDefault(); onChange(o); setOpen(false); }}>{o}</li>))}
-          {filtered.length===0 && <li className="none">No match</li>}
+          {filtered.length===0 && lead.length===0 && <li className="none">No match</li>}
         </ul>
       )}
     </div>
@@ -1354,7 +1489,7 @@ function AddBar({ state, defDate, addEntry }) {
       <select value={type} onChange={(e)=>setType(e.target.value)}>
         {TYPES.map((t)=>(<option key={t}>{t}</option>))}
       </select>
-      <div className="wide"><Combo value={category} onChange={setCategory} options={cats} placeholder="Search category…"/></div>
+      <div className="wide"><Combo value={category} onChange={setCategory} options={cats} top={topUsed(state, type)} placeholder="Search category…"/></div>
       {type==="Expenses" && buckets.length>0 && (
         <div className="bktwrap"><Combo value={bucket} onChange={(v)=>setBucket(v==="No bucket"?"":v)} options={["No bucket", ...buckets]} placeholder="Bucket…"/></div>
       )}
@@ -1380,6 +1515,19 @@ function Planning({ state, period, setSetting, setPlanAmt, addCat, removeCat, re
   const prevKey = addMonths(first, -1);
   const prevEntries = state.entries.filter((e) => e.date && countsMonth(e, state) === prevKey);
   const actual = (type, c) => prevEntries.filter((e) => e.type === type && e.category === c).reduce((a, e) => a + e.amount, 0);
+  // suggestions: average of the last 3 months that have data and whose statements are fully imported
+  const avgMonths = useMemo(() => [1, 2, 3].map((n) => addMonths(first, -n))
+    .filter((k) => statementGaps(state, k).length === 0 && state.entries.some((e) => e.date && countsMonth(e, state) === k)), [state, first]);
+  const avgFor = (type, c) => {
+    if (!avgMonths.length) return null;
+    const tot = state.entries.filter((e) => e.type === type && e.category === c && avgMonths.includes(countsMonth(e, state))).reduce((a, e) => a + e.amount, 0);
+    return tot > 0 ? Math.round(tot / avgMonths.length) : null;
+  };
+  const fillFromAverages = () => {
+    let n = 0;
+    TYPES.forEach((t) => state.categories[t].forEach((c) => { const v = avgFor(t, c); if (v && !perMonth(t, c)) { setPlanAmt(t, c, months, v); n++; } }));
+    setMsg(n ? { ok: true, text: `Filled ${n} empty budgets with their ${avgMonths.length}-month averages.` } : { ok: false, text: "No empty budgets with spending history to fill." });
+  };
   const src = single ? budgetSource(state, first) : null;
   const inherited = !!(single && src && src !== first);
   const sources = budgetedMonths(state).slice().reverse().filter((k) => !months.includes(k));
@@ -1402,6 +1550,7 @@ function Planning({ state, period, setSetting, setPlanAmt, addCat, removeCat, re
             </select>
             <button onClick={() => setMsg(copyBudget(srcKey, months))} disabled={!srcKey}>Copy</button>
           </div>
+          <button className="ghost" onClick={fillFromAverages} disabled={!avgMonths.length} title="Uses the last 3 complete months">Fill empty from averages</button>
           <button className="ghost" onClick={resetPlan}>Reset to original</button>
         </div>
       </div>
@@ -1427,7 +1576,7 @@ function Planning({ state, period, setSetting, setPlanAmt, addCat, removeCat, re
       {TYPES.map((type) => (
         <PlanSection key={type} type={type} cats={state.categories[type]} planAmt={(c) => perMonth(type, c)}
           total={total(type)} setPlanAmt={(c, v) => setPlanAmt(type, c, months, v)}
-          actual={(c) => actual(type, c)} actualLabel={MLABEL[+prevKey.slice(5) - 1]} inherited={inherited} perMonthLabel={single ? "Budget" : "Per month"}
+          actual={(c) => actual(type, c)} avg={(c) => avgFor(type, c)} actualLabel={MLABEL[+prevKey.slice(5) - 1]} inherited={inherited} perMonthLabel={single ? "Budget" : "Per month"}
           addCat={(n) => addCat(type, n)} removeCat={(c) => removeCat(type, c)} renameCat={(o, n) => renameCat(type, o, n)} />
       ))}
     </section>
@@ -1479,7 +1628,7 @@ function BucketName({ name, onRename }) {
   );
 }
 
-function PlanSection({ type, cats, planAmt, total, setPlanAmt, actual, actualLabel, inherited, perMonthLabel, addCat, removeCat, renameCat }) {
+function PlanSection({ type, cats, planAmt, total, setPlanAmt, actual, avg, actualLabel, inherited, perMonthLabel, addCat, removeCat, renameCat }) {
   const [newCat, setNewCat] = useState("");
   const tone = type === "Income" ? "emerald" : type === "Savings" ? "teal" : "clay";
   return (
@@ -1488,10 +1637,10 @@ function PlanSection({ type, cats, planAmt, total, setPlanAmt, actual, actualLab
         <h3 style={{ color: `var(--${tone})` }}>{type}</h3>
         <span className="mono total">{fmt(total)}</span>
       </div>
-      {cats.length > 0 && <div className="ap-planlegend"><span>{actualLabel} actual</span><span>{perMonthLabel}</span></div>}
+      {cats.length > 0 && <div className="ap-planlegend"><span>{actualLabel} actual · avg</span><span>{perMonthLabel}</span></div>}
       <div className="ap-planrows">
         {cats.map((c) => (
-          <PlanRow key={c} name={c} amount={planAmt(c)} actual={actual(c)} actualLabel={actualLabel} inherited={inherited}
+          <PlanRow key={c} name={c} amount={planAmt(c)} actual={actual(c)} avg={avg(c)} actualLabel={actualLabel} inherited={inherited}
             onAmount={(v) => setPlanAmt(c, v)} onRename={(n) => renameCat(c, n)} onRemove={() => removeCat(c)} />
         ))}
         {cats.length === 0 && <p className="ap-empty">No categories yet.</p>}
@@ -1506,7 +1655,7 @@ function PlanSection({ type, cats, planAmt, total, setPlanAmt, actual, actualLab
   );
 }
 
-function PlanRow({ name, amount, actual, actualLabel, inherited, onAmount, onRename, onRemove }) {
+function PlanRow({ name, amount, actual, avg, actualLabel, inherited, onAmount, onRename, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [amtFocus, setAmtFocus] = useState(false);
@@ -1523,7 +1672,10 @@ function PlanRow({ name, amount, actual, actualLabel, inherited, onAmount, onRen
       ) : (
         <span className="ap-planrow-name" onClick={() => setEditing(true)} title="Click to rename">{name}</span>
       )}
-      <span className="ap-actual mono" title={`Actually spent or received in ${actualLabel}`}>{actual ? fmt(actual) : "—"}</span>
+      <span className="ap-actual mono">
+        <span title={`Actually spent or received in ${actualLabel}`}>{actual ? fmt(actual) : "—"}</span>
+        {avg != null && avg !== amount && <button className="ap-avg" onClick={() => onAmount(avg)} title="Use the 3-month average as this budget">avg {fmt(avg)}</button>}
+      </span>
       <div className={"ap-amtwrap" + (inherited && !amtFocus ? " inherited" : "")}>
         <span className="cur">$</span>
         <input type="text" inputMode="decimal" value={shownAmt} placeholder={varies ? "varies" : "0"} aria-label={`Budget for ${name}`}
@@ -1652,7 +1804,7 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
                 <td className="mono nowrap">{x.date}</td>
                 <td><span className={"chip chip-"+x.type.toLowerCase()}>{x.type}</span></td>
                 <td className="cat">{x.category}</td>
-                <td className="det">{x.note||x.name||<span className="dim">—</span>}{x.importId && <span className="ap-srcpdf" title="Imported from a bank statement">PDF</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
+                <td className="det">{x.note||x.name||<span className="dim">—</span>}{x.importId && <span className="ap-srcpdf" title="Imported from a bank statement">PDF</span>}{x.src && x.src.raw && <span className="ap-rawline" title={x.src.raw}>{x.src.raw}</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
                 <td>{x.bucket ? <span className="bchip">{x.bucket}</span> : <span className="dim">—</span>}</td>
                 <td className="r mono" style={{color:x.type==="Income"?"var(--emerald)":x.type==="Savings"?"var(--teal)":"var(--ink)"}}>
                   {(x.type==="Income") !== (x.amount<0) ? "+" : "−"}{fmt2(Math.abs(x.amount))}</td>
@@ -1675,46 +1827,49 @@ const axisMoney = (v) => { const a = Math.abs(v), sign = v < 0 ? "-" : ""; retur
 function YearChart({ data }) {
   const W = 720, H = 240, padL = 46, padR = 12, padT = 14, padB = 26;
   const innerW = W - padL - padR, innerH = H - padT - padB;
-  const top = Math.max(1, ...data.map(d => Math.max(d.Income, d.Expenses, d.Net)));
-  const bottom = Math.min(0, ...data.map(d => d.Net));
+  const top = Math.max(1, ...data.map((d) => Math.max(d.Income, d.Expenses, d.Net, d.partial ? (d.PlanInc || 0) : 0)));
+  const bottom = Math.min(0, ...data.map((d) => d.Net));
   const range = (top - bottom) || 1;
   const y = (v) => padT + innerH * (1 - (v - bottom) / range);
   const groupW = innerW / data.length;
   const barW = Math.min(12, groupW * 0.3);
-  const ticks = 4;
-  const grid = Array.from({ length: ticks + 1 }, (_, i) => bottom + range * i / ticks);
+  const grid = Array.from({ length: 5 }, (_, i) => bottom + range * i / 4);
   const zero = y(0);
   const pts = data.map((d, i) => [padL + groupW * (i + 0.5), y(d.Net)]);
-  const linePath = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
   return (
-    <svg viewBox={"0 0 " + W + " " + H} width="100%" height="240" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox={"0 0 " + W + " " + H} width="100%" height="240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Income, expenses and net by month">
       {grid.map((gv, i) => (
         <g key={i}>
           <line x1={padL} x2={W - padR} y1={y(gv)} y2={y(gv)} stroke="var(--line)" strokeWidth="1" />
-          <text x={padL - 7} y={y(gv) + 3} textAnchor="end" fontSize="9" fontFamily="JetBrains Mono" fill="var(--ink-soft)">
-            {axisMoney(gv)}</text>
+          <text x={padL - 7} y={y(gv) + 3} textAnchor="end" fontSize="9" fontFamily="JetBrains Mono" fill="var(--ink-soft)">{axisMoney(gv)}</text>
         </g>
       ))}
       {data.map((d, i) => {
         const cx = padL + groupW * (i + 0.5);
         return (
           <g key={d.name}>
-            <rect x={cx - barW - 1} y={Math.min(y(d.Income), zero)} width={barW} height={Math.abs(zero - y(d.Income))} fill="var(--emerald)" rx="2">
-              <title>{d.name + " Income: $" + d.Income.toLocaleString()}</title></rect>
-            <rect x={cx + 1} y={Math.min(y(d.Expenses), zero)} width={barW} height={Math.abs(zero - y(d.Expenses))} fill="var(--clay)" rx="2">
-              <title>{d.name + " Expenses: $" + d.Expenses.toLocaleString()}</title></rect>
-            {(data.length <= 13 || i % Math.ceil(data.length / 12) === 0) && <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill="var(--ink-soft)">{d.name}</text>}
+            {d.partial && d.PlanInc > d.Income && (
+              <rect x={cx - barW - 1} y={y(d.PlanInc)} width={barW} height={Math.max(0, zero - y(d.PlanInc))} fill="none" stroke="var(--emerald)" strokeWidth="1.2" strokeDasharray="3 2" rx="2" />
+            )}
+            <rect x={cx - barW - 1} y={Math.min(y(d.Income), zero)} width={barW} height={Math.abs(zero - y(d.Income))} fill="var(--emerald)" rx="2" />
+            <rect x={cx + 1} y={Math.min(y(d.Expenses), zero)} width={barW} height={Math.abs(zero - y(d.Expenses))} fill="var(--clay)" rx="2" />
+            {(data.length <= 13 || i % Math.ceil(data.length / 12) === 0) && (
+              <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill={d.partial ? "#8A5A00" : "var(--ink-soft)"}>{d.name}{d.partial ? " ◐" : ""}</text>
+            )}
           </g>
         );
       })}
-      <path d={linePath} fill="none" stroke="var(--navy)" strokeWidth="2.5" />
+      {pts.slice(1).map((p, i) => {
+        const dim = data[i].partial || data[i + 1].partial;
+        return <line key={"s" + i} x1={pts[i][0]} y1={pts[i][1]} x2={p[0]} y2={p[1]} stroke={dim ? "var(--ink-soft)" : "var(--navy)"} strokeWidth="2" strokeDasharray={dim ? "4 3" : undefined} opacity={dim ? 0.55 : 1} />;
+      })}
       {pts.map((p, i) => (
-        <circle key={i} cx={p[0]} cy={p[1]} r="2.7" fill="var(--navy)">
-          <title>{data[i].name + " Net: $" + data[i].Net.toLocaleString()}</title></circle>
+        <circle key={"c" + i} cx={p[0]} cy={p[1]} r="3.5" fill={data[i].partial ? "var(--paper2)" : "var(--navy)"} stroke={data[i].partial ? "var(--ink-soft)" : "var(--navy)"} strokeWidth="1.5" />
       ))}
     </svg>
   );
 }
+
 
 function Year({ state, period, goMonth }) {
   const ms = period.months;
@@ -1725,7 +1880,9 @@ function Year({ state, period, goMonth }) {
     const sum = (t) => ent.filter((e) => e.type === t).reduce((a, e) => a + e.amount, 0);
     const inc = sum("Income"), exp = sum("Expenses"), sav = sum("Savings");
     const budget = state.categories.Expenses.reduce((a, c) => a + planFor(state, "Expenses", c, key), 0);
-    return { key, label: MLABEL[+key.slice(5) - 1] + (multiYear ? " ’" + key.slice(2, 4) : ""), inc, exp, sav, budget, net: inc - exp, count: ent.length };
+    const planInc = state.categories.Income.reduce((a, c) => a + planFor(state, "Income", c, key), 0);
+    const gaps = statementGaps(state, key);
+    return { key, label: MLABEL[+key.slice(5) - 1] + (multiYear ? " ’" + key.slice(2, 4) : ""), inc, exp, sav, budget, planInc, gaps, partial: gaps.length > 0, net: inc - exp, count: ent.length };
   }), [state, period, inR]);
 
   const tot = rows.reduce((a, r) => ({ inc: a.inc + r.inc, exp: a.exp + r.exp, sav: a.sav + r.sav, budget: a.budget + r.budget }), { inc: 0, exp: 0, sav: 0, budget: 0 });
@@ -1741,7 +1898,8 @@ function Year({ state, period, goMonth }) {
   const maxBucket = topBuckets[0]?.v || 1;
   const hasBucketSpend = topBuckets.some((b) => b.c !== "Untagged");
 
-  const chartData = rows.map((r) => ({ name: r.label, Income: Math.round(r.inc), Expenses: Math.round(r.exp), Net: Math.round(r.net) }));
+  const chartData = rows.map((r) => ({ name: r.label, Income: Math.round(r.inc), Expenses: Math.round(r.exp), Net: Math.round(r.net), partial: r.partial, PlanInc: Math.round(r.planInc) }));
+  const partialRows = rows.filter((r) => r.partial);
   const hasData = tot.inc > 0 || tot.exp > 0;
 
   return (
@@ -1757,7 +1915,8 @@ function Year({ state, period, goMonth }) {
         <h3 className="ap-mini-t" style={{ marginBottom: 6 }}>Monthly flow · {period.label}</h3>
         {hasData ? <YearChart data={chartData} /> : <p className="ap-empty">No transactions logged in {period.label}.</p>}
         <div className="ap-legend"><span><i style={{ background: "var(--emerald)" }} />Income</span>
-          <span><i style={{ background: "var(--clay)" }} />Expenses</span><span><i style={{ background: "var(--navy)" }} />Net</span></div>
+          <span><i style={{ background: "var(--clay)" }} />Expenses</span><span><i style={{ background: "var(--navy)" }} />Net</span>
+          {partialRows.length > 0 && <span><i className="ap-dashkey" />Planned income, not imported yet</span>}</div>
         <p className="ap-chartnote">The <b>Net</b> line is income minus expenses each month. Above $0 you came out ahead; below $0 you spent more than came in.</p>
       </div>
 
@@ -1771,11 +1930,11 @@ function Year({ state, period, goMonth }) {
                 const d = r.budget - r.exp;
                 return (
                   <tr key={r.key} onClick={() => goMonth(r.key)} title="Open this month">
-                    <td className="mlbl">{r.label}{r.count > 0 && <em className="ap-cnt">{r.count}</em>}</td>
+                    <td className="mlbl">{r.label}{r.count > 0 && <em className="ap-cnt">{r.count}</em>}{r.partial && <span className="ap-partial">partial</span>}</td>
                     <td className="r mono dim">{r.budget ? fmt(r.budget) : "—"}</td>
                     <td className="r mono">{r.exp ? fmt(r.exp) : "—"}</td>
                     <td className="r mono" style={{ color: r.budget ? (d >= 0 ? "var(--emerald)" : "var(--clay)") : "var(--ink-soft)" }}>{r.budget ? ((d >= 0 ? "+" : "") + fmt(d)) : "—"}</td>
-                    <td className="r mono" style={{ color: r.net >= 0 ? "var(--emerald)" : "var(--clay)" }}>{(r.inc || r.exp) ? fmt(r.net) : "—"}</td>
+                    <td className="r mono" style={{ color: r.partial ? "var(--ink-soft)" : r.net >= 0 ? "var(--emerald)" : "var(--clay)" }}>{(r.inc || r.exp) ? fmt(r.net) : "—"}</td>
                   </tr>
                 );
               })}
@@ -1784,6 +1943,12 @@ function Year({ state, period, goMonth }) {
               <td className="r mono" style={{ color: (tot.budget - tot.exp) >= 0 ? "var(--emerald)" : "var(--clay)" }}>{((tot.budget - tot.exp) >= 0 ? "+" : "") + fmt(tot.budget - tot.exp)}</td>
               <td className="r mono" style={{ color: (tot.inc - tot.exp) >= 0 ? "var(--emerald)" : "var(--clay)" }}>{fmt(tot.inc - tot.exp)}</td></tr></tfoot>
           </table>
+          {partialRows.length > 0 && (
+            <div className="ap-gaplist">
+              <b>Partial months</b> have statements that aren't imported yet, so their income, spending and net are incomplete:
+              <ul>{partialRows.map((r) => <li key={r.key}><b>{r.label}</b> · missing {r.gaps.map((g) => gapLabel(state, g)).join("; ")}</li>)}</ul>
+            </div>
+          )}
         </div>
 
         <div className="ap-card">
@@ -2051,6 +2216,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
   const [showSkipped, setShowSkipped] = useState(false);
   const fileRef = useRef(null);
   const imp = importerOf(state);
+  const frequent = useMemo(() => ({ Expenses: topUsed(state, "Expenses"), Income: topUsed(state, "Income") }), [state]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape" && !busy) onClose(); };
@@ -2168,7 +2334,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
         <header className="ap-imp-head">
           <div>
             <h2 className="ap-imp-title">{title}</h2>
-            {view === "review" && stmt && <p className="ap-imp-sub">{stmt.label} ····{stmt.last4} · {fmtRange(stmt.start, stmt.end)} · <span className="ok">totals match the statement</span></p>}
+            {view === "review" && stmt && <p className="ap-imp-sub">{SI.acctLabel(stmt.last4, stmt.kind, imp.accounts[stmt.last4] || { label: stmt.label })} · {fmtRange(stmt.start, stmt.end)} · <span className="ok">totals match the statement</span></p>}
           </div>
           <div className="ap-imp-headbtns">
             {(view === "pick" || view === "history" || view === "rules" || view === "done" || view === "error") && (
@@ -2190,6 +2356,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
             <p className="ap-imp-fine">Picking a category for one transaction fills in the others from the same merchant on that statement, and it's remembered for next time.</p>
             <button className="ap-imp-primary" onClick={() => fileRef.current?.click()}>Choose statement PDF</button>
             <p className="ap-imp-fine">Nothing is added until you review it. Each statement can be imported once, and any import can be undone from History.</p>
+            <StatementCoverage imp={imp} updateImporter={updateImporter} />
           </div>
         )}
 
@@ -2237,7 +2404,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
               {groups["needs-category"].length > 0 && (
                 <section className="ap-imp-group">
                   <h3>Needs a category <span className="n">{groups["needs-category"].length}</span></h3>
-                  {groups["needs-category"].map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
+                  {groups["needs-category"].map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
                 </section>
               )}
 
@@ -2245,7 +2412,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                 <section className="ap-imp-group">
                   <h3>Possible duplicates <span className="n">{groups.duplicate.length}</span></h3>
                   <p className="ap-imp-hint">These match something already logged: same amount, within 3 days.</p>
-                  {groups.duplicate.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
+                  {groups.duplicate.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
                 </section>
               )}
 
@@ -2253,7 +2420,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                 <button className="ap-imp-toggle" onClick={() => setShowReady((v) => !v)} aria-expanded={showReady}>
                   <span>Ready to import <span className="n">{ready.length}</span></span><span className="chev">{showReady ? "Hide" : "Review"}</span>
                 </button>
-                {showReady && ready.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
+                {showReady && ready.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
               </section>
 
               <section className="ap-imp-group">
@@ -2311,6 +2478,47 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
   );
 }
 
+function StatementCoverage({ imp, updateImporter }) {
+  const byAcct = {};
+  imp.imports.forEach((i) => { (byAcct[i.acct] = byAcct[i.acct] || []).push(i); });
+  const ids = [...new Set([...Object.keys(byAcct), ...Object.entries(imp.accounts).filter(([, a]) => a.ours && a.statements).map(([id]) => id)])];
+  if (!ids.length) return null;
+  const today = localToday();
+  const kindName = { card: "Credit card", savings: "Savings", checking: "Checking" };
+  return (
+    <section className="ap-imp-cover">
+      <h3>Your statements</h3>
+      {ids.map((id) => {
+        const a = imp.accounts[id] || {};
+        const list = (byAcct[id] || []).slice().sort((x, y) => x.start.localeCompare(y.start));
+        const gaps = [];
+        for (let k = 1; k < list.length; k++) { const after = addDaysISO(list[k - 1].end, 1); if (list[k].start > after) gaps.push({ from: after, to: addDaysISO(list[k].start, -1) }); }
+        const last = list[list.length - 1];
+        const stale = last && daysBetween(last.end, today) > 35;
+        return (
+          <div key={id} className="ap-imp-cov">
+            <div className="top">
+              <b>{SI.acctLabel(id, a.kind, a)}</b>
+              {kindName[a.kind] && <span className="kind">{kindName[a.kind]}</span>}
+              <button className="ap-imp-link" onClick={() => {
+                const n = window.prompt("Nickname for this account (for example: Shared debit)", a.nickname || "");
+                if (n !== null) updateImporter((m) => { m.accounts[id] = { ...(m.accounts[id] || {}), nickname: n.trim() || undefined }; });
+              }}>Rename</button>
+            </div>
+            {list.length ? (
+              <div className="chips">
+                {list.map((i) => <span key={i.id} className="chip">{fmtRange(i.start, i.end)}</span>)}
+                {gaps.map((g) => <span key={g.from} className="chip gap">Missing {fmtRange(g.from, g.to)}</span>)}
+              </div>
+            ) : <p className="ap-imp-fine">No statements imported yet.</p>}
+            {last && <p className={"ap-imp-fine" + (stale ? " warn" : "")}>{stale ? `Latest ends ${shortDate(last.end)}, ${last.end.slice(0, 4)}. A newer statement is probably ready.` : `Up to date through ${shortDate(last.end)}, ${last.end.slice(0, 4)}.`}</p>}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function AccountPrompt({ acct, onAnswer }) {
   const multi = acct.kind === "card" || acct.kind === "savings";
   return (
@@ -2331,7 +2539,38 @@ function AccountPrompt({ acct, onAnswer }) {
   );
 }
 
-function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory }) {
+function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ql = q.trim().toLowerCase();
+  const rank = (o) => { const i = frequent.indexOf(o); return i < 0 ? 99 : i; };
+  const top = ql ? [] : frequent.filter((o) => options.includes(o));
+  const rest = options.filter((o) => (ql ? o.toLowerCase().includes(ql) : !top.includes(o)));
+  if (ql) rest.sort((a, b) => rank(a) - rank(b));
+  const pick = (v) => { onPick(v); setOpen(false); setQ(""); };
+  const item = (v, label, cls) => <li key={cls + v} className={cls} onMouseDown={(e) => { e.preventDefault(); pick(v); }}>{label}</li>;
+  return (
+    <div className="ap-combo ap-catpick">
+      <input type="text" className={valueLabel ? "" : "empty"} value={open ? q : valueLabel} placeholder="Type to find a category…" aria-label={ariaLabel}
+        onFocus={() => { setOpen(true); setQ(""); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => { if (e.key === "Enter" && ql && rest[0]) { pick(rest[0]); e.target.blur(); } if (e.key === "Escape") { setOpen(false); e.target.blur(); } }} />
+      {open && (
+        <ul className="ap-combo-list">
+          {top.length > 0 && <li className="hd">Most used</li>}
+          {top.map((o) => item(o, o, "t"))}
+          {top.length > 0 && rest.length > 0 && <li className="hd">All categories</li>}
+          {rest.map((o) => item(o, o, ""))}
+          {ql && rest.length === 0 && <li className="none">No category matches “{q}”</li>}
+          <li className="hd">Other</li>
+          {extras.map(([v, l]) => item(v, l, "x"))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent }) {
   const isMain = c.kind === "expense" || c.kind === "income";
   const type = c.dir === "out" ? "Expenses" : "Income";
   const value = c.userSkip ? (c.rememberSkip ? "__skipall" : "__skip") : c.category ? `${c.type}::${c.category}` : "";
@@ -2354,20 +2593,16 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory }) {
         <span className="m" title={c.desc}>{c.merchant}{c.memo && <span className="memo"> “{c.memo}”</span>}</span>
         <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.amount < 0 ? "−" : "+"}{centsFmt(c.amount)}</span>
       </div>
+      <div className="ap-imp-raw" title={c.desc}>{c.desc}</div>
       {(c.fx || c.feeMerged > 0) && <div className="ap-imp-why">{c.fx}{c.fx && c.feeMerged ? " · " : ""}{c.feeMerged > 0 && `includes ${fmt2(c.feeMerged / 100)} foreign fee`}</div>}
 
       {isMain && (
         <div className="ap-imp-pickrow">
-          <select className={value ? "" : "empty"} value={value} onChange={(e) => onPick(e.target.value)} aria-label={`Category for ${c.merchant}`}>
-            <option value="">Choose a category…</option>
-            <optgroup label={type}>{ctx.categories[type].map((cat) => <option key={cat} value={`${type}::${cat}`}>{cat}</option>)}</optgroup>
-            <optgroup label="Other">
-              <option value="__new">New category…</option>
-              {c.person && <option value="__between">Money between us (skip)</option>}
-              <option value="__skip">Don't import</option>
-              {c.key && !c.person && <option value="__skipall">Don't import, and always skip this</option>}
-            </optgroup>
-          </select>
+          <CatPicker ariaLabel={`Category for ${c.merchant}`}
+            valueLabel={c.userSkip ? (c.rememberSkip ? "Don't import (always)" : "Don't import") : (value ? c.category : "")}
+            options={ctx.categories[type]} frequent={(frequent && frequent[type]) || []}
+            extras={[["__new", "New category…"], ...(c.person ? [["__between", "Money between us (skip)"]] : []), ["__skip", "Don't import"], ...(c.key && !c.person ? [["__skipall", "Don't import, always skip this"]] : [])]}
+            onPick={(v) => onPick(v.startsWith("__") ? v : `${type}::${v}`)} />
           {tag && <span className="ap-imp-tag">{tag}</span>}
         </div>
       )}
@@ -2476,6 +2711,56 @@ function ImportRules({ imp, categories, updateImporter }) {
   );
 }
 
+
+/* ================= BACKUPS ================= */
+function BackupsSheet({ listBackups, saveNow, restoreBackup, downloadCopy, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async () => { setErr(""); try { setRows(await listBackups()); } catch (e) { setErr("Couldn't load backups. Check your connection."); setRows([]); } };
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape" && !busy) onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
+  const when = (iso) => { const d = new Date(iso); return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }); };
+  return (
+    <div className="ap-imp-overlay" role="dialog" aria-modal="true" aria-label="Backups">
+      <div className="ap-imp-sheet">
+        <header className="ap-imp-head">
+          <div>
+            <h2 className="ap-imp-title">Backups</h2>
+            <p className="ap-imp-sub">A copy of the whole budget is saved once a day and before every import, undo, reset or restore.</p>
+          </div>
+          <div className="ap-imp-headbtns"><button className="ap-imp-close" onClick={onClose} aria-label="Close">×</button></div>
+        </header>
+        <div className="ap-imp-body">
+          <div className="ap-imp-footbtns" style={{ marginBottom: 14 }}>
+            <button className="ap-imp-primary" disabled={busy} onClick={async () => { setBusy(true); await saveNow(); await load(); setBusy(false); }}>Save a copy now</button>
+            <button className="ap-imp-secondary" onClick={downloadCopy}>Download a copy</button>
+          </div>
+          {err && <div className="ap-imp-warn">{err}</div>}
+          {rows === null && <p className="ap-imp-fine">Loading…</p>}
+          {rows && rows.length === 0 && !err && <p className="ap-empty">No backups yet. The first one is saved the next time the app opens.</p>}
+          {rows && rows.map((r) => (
+            <div key={r.id} className="ap-imp-hist">
+              <div>
+                <b>{when(r.at)}</b>
+                <div className="ap-imp-fine">{r.label}{r.by ? ` · ${r.by}` : ""}{r.entries != null ? ` · ${r.entries} records` : ""}</div>
+              </div>
+              <button className="ap-imp-secondary" disabled={busy} onClick={async () => {
+                if (!confirm(`Restore the budget to how it was on ${when(r.at)}? The current version is backed up first, so you can undo this.`)) return;
+                setBusy(true); const ok = await restoreBackup(r.id); setBusy(false);
+                if (ok) onClose(); else setErr("Couldn't restore that backup.");
+              }}>Restore</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Styles() {
   return (<style>{`
@@ -2768,6 +3053,39 @@ function Styles() {
   .ap-paysetting select{font-family:'Archivo';font-size:13px;color:var(--ink);background:var(--paper2);border:1.5px solid var(--line);border-radius:7px;padding:4px 6px;}
   .ap-countsin{font-size:10.5px;font-weight:600;color:var(--emerald);background:#E7F1EA;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:1px;white-space:nowrap;}
   .ap-countsel{display:block;margin-top:6px;font-family:'Archivo';font-size:12px;border:1.5px solid var(--line);border-radius:6px;padding:3px 5px;background:var(--paper2);}
+
+  .ap-combo-list li.hd{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);padding:8px 11px 3px;cursor:default;background:none;}
+  .ap-combo-list li.x{color:var(--navy);font-weight:600;}
+  .ap-catpick{min-width:250px;flex:1;max-width:340px;}
+  .ap-catpick input.empty{border-color:var(--clay);}
+  .ap-catpick .ap-combo-list{max-height:330px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .ap-imp-raw{font-family:'JetBrains Mono';font-size:10.5px;color:var(--ink-soft);margin:3px 0 0 58px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;}
+  .ap-rawline{display:block;font-family:'JetBrains Mono';font-size:10px;color:var(--ink-soft);margin-top:3px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-imp-cover{margin-top:22px;border-top:1.5px solid var(--line);padding-top:16px;}
+  .ap-imp-cover h3{font-family:'Archivo';font-size:14px;font-weight:700;margin:0 0 10px;}
+  .ap-imp-cov{border:1.5px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:8px;background:#fff;}
+  .ap-imp-cov .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;}
+  .ap-imp-cov .kind{font-size:11.5px;color:var(--ink-soft);}
+  .ap-imp-cov .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .ap-imp-cov .chip{font-size:11.5px;font-weight:600;color:var(--emerald);background:#E7F1EA;border-radius:6px;padding:3px 8px;}
+  .ap-imp-cov .chip.gap{color:#8A5A00;background:#FBF0D9;}
+  .ap-imp-fine.warn{color:#8A5A00;font-weight:600;}
+  @media(max-width:600px){ .ap-imp-raw{margin-left:0;} .ap-catpick{max-width:none;} }
+
+  .ap-partialnote{font-size:13px;color:#6B4700;background:#FBF0D9;border:1px solid #EBD3A0;border-radius:10px;padding:10px 12px;margin:-4px 0 14px;line-height:1.45;}
+  .ap-partial{font-size:10px;font-weight:700;color:#8A5A00;background:#FBF0D9;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:1px;}
+  .ap-gaplist{font-size:12.5px;color:var(--ink-soft);margin-top:12px;line-height:1.45;}
+  .ap-gaplist ul{margin:6px 0 0;padding-left:18px;}
+  .ap-dashkey{display:inline-block;width:11px;height:11px;border:1.5px dashed var(--emerald);border-radius:3px;margin-right:6px;vertical-align:-1px;background:none !important;}
+  .ap-paced{position:relative;overflow:visible;}
+  .ap-paced .ap-fill{border-radius:5px;}
+  .ap-today{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55;border-radius:1px;transform:translateX(-1px);}
+  .ap-pace{font-size:11.5px;color:#8A5A00;margin-top:6px;line-height:1.35;}
+  .ap-pacenote.warn{color:#8A5A00;}
+  .ap-actual{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+  .ap-avg{font-family:'JetBrains Mono';font-size:10.5px;color:var(--teal);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline dotted;}
+  .ap-footlink{font-family:'JetBrains Mono';font-size:12px;color:var(--navy);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;}
+  .ap-plan-actions button:disabled{opacity:.5;cursor:not-allowed;}
 
   /* statement import */
   .ap-iobtn.strong{background:var(--navy);color:var(--paper2);border-color:var(--navy);}
