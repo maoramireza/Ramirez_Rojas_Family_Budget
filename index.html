@@ -353,6 +353,136 @@ window.addEventListener("error", function(e){
     return { ok: errors.length === 0, errors, statement: st };
   }
 
+
+  /* ---------------- photos: on-device text recognition (Tesseract.js, runs in the browser, no uploads) ---------------- */
+  const TESS_VERSION = "5.0.5";
+  let tessPromise = null;
+  function loadTesseract() {
+    if (root.Tesseract) return Promise.resolve(root.Tesseract);
+    if (tessPromise) return tessPromise;
+    tessPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = `https://cdn.jsdelivr.net/npm/tesseract.js@${TESS_VERSION}/dist/tesseract.min.js`;
+      s.async = true;
+      const timer = setTimeout(() => reject(new Error("The photo reader took too long to load. Check your connection and try again.")), 30000);
+      s.onload = () => { clearTimeout(timer); root.Tesseract ? resolve(root.Tesseract) : reject(new Error("The photo reader loaded but didn't start.")); };
+      s.onerror = () => { clearTimeout(timer); reject(new Error("Couldn't load the photo reader. Check your connection and try again.")); };
+      document.head.appendChild(s);
+    }).catch((e) => { tessPromise = null; throw e; });
+    return tessPromise;
+  }
+  // Big camera photos are scaled down (faster, same accuracy) and flattened onto a canvas.
+  function imageToCanvas(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); resolve(c);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Couldn't open ${file.name} as an image.`)); };
+      img.src = url;
+    });
+  }
+  async function readImageTexts(files, onProgress) {
+    const T = await loadTesseract();
+    let current = 0;
+    const worker = await T.createWorker("eng", 1, { logger: (m) => { if (onProgress && m.status === "recognizing text") onProgress(current, files.length, m.progress || 0); } });
+    try {
+      const out = [];
+      for (let i = 0; i < files.length; i++) {
+        current = i; if (onProgress) onProgress(i, files.length, 0);
+        const { data } = await worker.recognize(await imageToCanvas(files[i]));
+        out.push((data && data.text) || "");
+      }
+      return out;
+    } finally { await worker.terminate(); }
+  }
+
+  const MON3 = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12 };
+  // OCR often reads "$" as "S"; amounts must end in two decimals.
+  const MONEY_RX = /(?:^|\s)((?:[-\u2212\u2013]\s?)?[$S]?\s?\d{1,3}(?:,\d{3})*[.,]\d{2}|(?:[-\u2212\u2013]\s?)?[$S]?\s?\d+[.,]\d{2})(?=\s|$)/g;
+  function moneyTokens(line) {
+    const out = []; let m; MONEY_RX.lastIndex = 0;
+    while ((m = MONEY_RX.exec(line))) {
+      const tok = m[1], neg = /^[-\u2212\u2013]/.test(tok);
+      const digits = tok.replace(/[^\d.,]/g, ""), cut = digits.length - 3;
+      const cents = parseInt(digits.slice(0, cut).replace(/[.,]/g, "") || "0", 10) * 100 + parseInt(digits.slice(cut + 1), 10);
+      if (!isNaN(cents)) out.push({ tok, cents, neg });
+    }
+    return out;
+  }
+  function findDate(line, todayIso) {
+    let m;
+    if ((m = line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/)) && validMD(+m[2], +m[3])) return { iso: iso(+m[1], +m[2], +m[3]), tok: m[0] };
+    if ((m = line.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/)) && validMD(+m[1], +m[2])) { const y = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return { iso: iso(y, +m[1], +m[2]), tok: m[0] }; }
+    if ((m = line.match(/\b(\d{1,2})\/(\d{1,2})\b/)) && validMD(+m[1], +m[2])) return { iso: inferYear(+m[1], +m[2], todayIso, 3), tok: m[0] };
+    if ((m = line.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?\b/i))) {
+      const mo = MON3[m[1].toLowerCase()], d = +m[2];
+      if (validMD(mo, d)) return { iso: m[3] ? iso(+m[3], mo, d) : inferYear(mo, d, todayIso, 3), tok: m[0] };
+    }
+    if (/\btoday\b|\bpending\b|\bprocessing\b/i.test(line)) return { iso: todayIso, tok: (line.match(/\btoday\b|\bpending\b|\bprocessing\b/i) || [""])[0] };
+    if (/\byesterday\b/i.test(line)) return { iso: addDays(todayIso, -1), tok: line.match(/\byesterday\b/i)[0] };
+    return null;
+  }
+  const INFLOW_RX = /deposit|payroll|refund|\bcredit\b|zelle (payment )?from|transfer from|interest|cash ?back|received|reversal/i;
+  const clean = (s) => s.replace(/[|_~•·]+/g, " ").replace(/\s+/g, " ").replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, "").trim();
+  const looksReceipt = (text) => /\btotal\b/i.test(text);
+
+  function parsePhotoList(text, pi, todayIso) {
+    const lines = text.split(/\n/).map((t) => t.trim()).filter(Boolean);
+    const rows = []; let curDate = null, pendingDesc = null;
+    lines.forEach((line, li) => {
+      if (/balance|available|statement|search|filter|see all/i.test(line)) return;
+      const money = moneyTokens(line), d = findDate(line, todayIso);
+      if (!money.length) {
+        const letters = (line.match(/[A-Za-z]/g) || []).length;
+        if (d && letters <= 12) curDate = d.iso;                 // a date header ("July 27, 2026")
+        else if (letters >= 3) pendingDesc = line;               // a description on its own line
+        return;
+      }
+      const mt = money[money.length - 1];
+      let desc = line; money.forEach((x) => { desc = desc.replace(x.tok, " "); }); if (d) desc = desc.replace(d.tok, " ");
+      desc = clean(desc);
+      if (!/[A-Za-z]{2}/.test(desc)) desc = pendingDesc ? clean(pendingDesc) : "";
+      // a date on the row wins, then the date header above it; only look below when there's no header yet
+      let date = (d && d.iso) || curDate;
+      if (!date) { const nx = lines[li + 1]; const nd = nx && !moneyTokens(nx).length ? findDate(nx, todayIso) : null; date = (nd && nd.iso) || todayIso; }
+      const out = mt.neg || !INFLOW_RX.test(desc);
+      rows.push({ id: `p${pi}-${rows.length}`, photo: pi, fromPhoto: true, desc: desc || "Transaction", amount: out ? -mt.cents : mt.cents, date, postDate: date, section: out ? "withdrawals" : "deposits" });
+      pendingDesc = null;
+    });
+    return rows;
+  }
+  function parsePhotoReceipt(text, pi, todayIso) {
+    const lines = text.split(/\n/).map((t) => t.trim()).filter(Boolean);
+    const store = clean((lines.find((l) => (l.match(/[A-Za-z]/g) || []).length >= 3 && !/welcome|receipt|thank|customer copy|store #|tel|phone|www\./i.test(l)) || "Receipt").replace(/[^A-Za-z0-9&' .\-]/g, " "));
+    let date = null; for (const l of lines) { const d = findDate(l, todayIso); if (d) { date = d.iso; break; } }
+    let total = null;
+    lines.forEach((l) => {
+      if (/\b(total|amount due|balance due|grand total)\b/i.test(l) && !/sub\s?-?\s?total|\btax\b|saved|savings|items?\b/i.test(l)) {
+        const m = moneyTokens(l); if (m.length) total = m[m.length - 1].cents;
+      }
+    });
+    if (total === null) { const all = lines.flatMap((l) => moneyTokens(l).map((x) => x.cents)); if (all.length) total = Math.max(...all); }
+    if (!total) return [];
+    const dt = date || todayIso;
+    return [{ id: `p${pi}-0`, photo: pi, fromPhoto: true, desc: store || "Receipt", amount: -total, date: dt, postDate: dt, section: "withdrawals" }];
+  }
+  // texts: OCR text per photo. modes: per photo "auto" | "list" | "receipt".
+  function parsePhotos(texts, modes, todayIso) {
+    const used = texts.map((t, i) => (modes && modes[i] && modes[i] !== "auto") ? modes[i] : (looksReceipt(t) ? "receipt" : "list"));
+    const rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso) : parsePhotoList(t, i, todayIso));
+    const dates = rows.map((r) => r.date).sort();
+    let h = 5381; const all = texts.join("\n"); for (let i = 0; i < all.length; i++) h = ((h << 5) + h + all.charCodeAt(i)) | 0;
+    return { bank: "photo", kind: "photo", photo: true, label: texts.length > 1 ? `${texts.length} photos` : "Photo", last4: null,
+      start: dates[0] || todayIso, end: dates[dates.length - 1] || todayIso, rows, holders: [], errors: [], modes: used,
+      fingerprint: "photo:" + (h >>> 0).toString(16) + ":" + texts.length };
+  }
+
   /* ---------------- merchant keys (for memory) ---------------- */
   const STATES = new Set("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY ON QC BC AB MB NS NB NL PE SK".split(" "));
   function cleanTokens(s) {
@@ -377,7 +507,7 @@ window.addEventListener("error", function(e){
       const id = cleanTokens(m[2]).join(" ");
       return { key: "PAYPAL " + id, name: "PayPal: " + titleCase(id) };
     }
-    if ((m = desc.match(/^Zelle payment (to|from)\s+(.+?)(?:\s+for\s+"([^"]*)")?\s*;?\s*Conf#/i))) {
+    if ((m = desc.match(/^Zelle payment (to|from)\s+(.+?)(?:\s+for\s+"([^"]*)")?\s*;?\s*(?:Conf#.*)?$/i))) {
       const who = m[2].trim().replace(/\s+/g, " ");
       return { key: `ZELLE ${who.toUpperCase()}`, name: `Zelle ${m[1].toLowerCase()} ${titleCase(who)}`, memo: m[3] || null, person: who.toUpperCase() };
     }
@@ -494,7 +624,7 @@ window.addEventListener("error", function(e){
     const cands = rows.filter((r) => !merged.has(r.id) && r.amount !== 0).map((r) => {
       const mi = merchantInfo(r.desc);
       const c = { id: r.id, date: r.date, desc: r.desc, amount: r.amount, dir: r.amount < 0 ? "out" : "in",
-        merchant: mi.name, key: mi.ambiguous ? null : mi.key, memo: mi.memo || null, person: mi.person || null, fx: r.fx || null, feeMerged: r.feeMerged || 0,
+        merchant: mi.name, key: mi.ambiguous ? null : mi.key, memo: mi.memo || null, person: mi.person || null, fromPhoto: !!r.fromPhoto, fx: r.fx || null, feeMerged: r.feeMerged || 0,
         orderTok: orderToks(r.desc),
         section: r.section, kind: null, skipReason: null, type: null, category: null, source: null,
         savingsDelta: 0, savingsAcct: null, pendingAccount: null, dupOf: null, dupDecision: null };
@@ -640,7 +770,7 @@ window.addEventListener("error", function(e){
       if (c.fx) noteParts.push(c.fx);
       if (c.feeMerged) noteParts.push(`incl. ${fmtC(c.feeMerged)} foreign fee`);
       const note = noteParts.filter(Boolean).join(" · ");
-      const src = { acct: st.last4, key: c.key || undefined, tok: c.orderTok.length ? c.orderTok : undefined, raw: c.desc };
+      const src = { acct: st.last4 || undefined, key: c.key || undefined, tok: c.orderTok.length ? c.orderTok : undefined, raw: c.desc, photo: st.photo || undefined };
       if (c.kind === "expense" || c.kind === "income") {
         entries.push({ id: makeId(), date: c.date, type: c.type, category: c.category, amount: Math.abs(c.amount) / 100, note,
           bucket: c.type === "Expenses" && c.bucket ? c.bucket : undefined, importId, src });
@@ -660,7 +790,7 @@ window.addEventListener("error", function(e){
   }
 
   const api = { toCents, fmtC, itemsToLines, readPdfLines, loadPdfJs, detect, parseStatement, merchantInfo, findRule,
-    keywordCategory, counterpartyOf, classify, statusOf, savingsCategory, rowSavingsCategory, buildEntries, acctLabel, PDFJS_VERSION };
+    keywordCategory, counterpartyOf, classify, readImageTexts, parsePhotos, loadTesseract, statusOf, savingsCategory, rowSavingsCategory, buildEntries, acctLabel, PDFJS_VERSION };
   root.StmtImport = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -697,7 +827,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-23 (backups)";
+const APP_VERSION = "2026-09-24 (photos)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -885,15 +1015,15 @@ function App({ session, onSignOut }) {
     await doSave(next);
     return { ok: JSON.stringify(next) === lastSavedRef.current };
   };
-  const commitImport = async (args) => { await backupBefore(`Before importing ${args.stmt.label} ····${args.stmt.last4}`); return commitImportNow(args); };
+  const commitImport = async (args) => { await backupBefore(args.stmt.photo ? "Before importing photos" : `Before importing ${args.stmt.label} ····${args.stmt.last4}`); return commitImportNow(args); };
   const commitImportNow = ({ stmt, importId, built, answers, extraCats, by }) => commit((s) => {
     const imp = { ...EMPTY_IMPORTER, ...(s.importer || {}) };
     if (imp.imports.some((i) => i.fp === stmt.fingerprint)) return false;
     TYPES.forEach((t) => (extraCats[t] || []).forEach((name) => {
       if (!s.categories[t].includes(name)) { s.categories[t].push(name); s.plan[t] = s.plan[t] || {}; s.plan[t][name] = s.plan[t][name] || {}; }
     }));
-    imp.accounts = { ...imp.accounts, ...answers.accounts,
-      [stmt.last4]: { ...(imp.accounts[stmt.last4] || {}), ...(answers.accounts[stmt.last4] || {}), kind: stmt.kind, label: stmt.label, ours: true, statements: true } };
+    imp.accounts = { ...imp.accounts, ...answers.accounts };
+    if (!stmt.photo) imp.accounts[stmt.last4] = { ...(imp.accounts[stmt.last4] || {}), ...(answers.accounts[stmt.last4] || {}), kind: stmt.kind, label: stmt.label, ours: true, statements: true };
     imp.people = { ...imp.people, ...answers.people };
     imp.holders = [...new Set([...imp.holders, ...stmt.holders])];
     imp.rules = { ...imp.rules, ...built.rules };
@@ -1165,7 +1295,7 @@ function statementGaps(state, key) {
   if (ms > today) return [];
   const me = monthEnd(key) < today ? monthEnd(key) : today;
   const byAcct = {};
-  imp.imports.forEach((i) => { (byAcct[i.acct] = byAcct[i.acct] || []).push(i); });
+  imp.imports.forEach((i) => { if (i.kind !== "photo") (byAcct[i.acct] = byAcct[i.acct] || []).push(i); });
   const gaps = [];
   Object.entries(byAcct).forEach(([acct, raw]) => {
     const list = raw.slice().sort((a, b) => a.start.localeCompare(b.start));
@@ -1804,7 +1934,7 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
                 <td className="mono nowrap">{x.date}</td>
                 <td><span className={"chip chip-"+x.type.toLowerCase()}>{x.type}</span></td>
                 <td className="cat">{x.category}</td>
-                <td className="det">{x.note||x.name||<span className="dim">—</span>}{x.importId && <span className="ap-srcpdf" title="Imported from a bank statement">PDF</span>}{x.src && x.src.raw && <span className="ap-rawline" title={x.src.raw}>{x.src.raw}</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
+                <td className="det">{x.note||x.name||<span className="dim">—</span>}{x.importId && <span className="ap-srcpdf" title={x.src && x.src.photo ? "Read from a photo" : "Imported from a bank statement"}>{x.src && x.src.photo ? "PHOTO" : "PDF"}</span>}{x.src && x.src.raw && <span className="ap-rawline" title={x.src.raw}>{x.src.raw}</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
                 <td>{x.bucket ? <span className="bchip">{x.bucket}</span> : <span className="dim">—</span>}</td>
                 <td className="r mono" style={{color:x.type==="Income"?"var(--emerald)":x.type==="Savings"?"var(--teal)":"var(--ink)"}}>
                   {(x.type==="Income") !== (x.amount<0) ? "+" : "−"}{fmt2(Math.abs(x.amount))}</td>
@@ -2211,6 +2341,9 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
   const [overrides, setOverrides] = useState({});
   const [extraCats, setExtraCats] = useState({ Expenses: [], Income: [], Savings: [] });
   const [result, setResult] = useState(null);
+  const [photoTexts, setPhotoTexts] = useState(null);   // OCR text per photo, kept so "read as" can re-parse
+  const [edits, setEdits] = useState({});               // photo rows: corrected store, date, amount, direction
+  const [readingMsg, setReadingMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [showReady, setShowReady] = useState(false);
   const [showSkipped, setShowSkipped] = useState(false);
@@ -2227,39 +2360,72 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
   }, [busy, onClose]);
 
   const reset = () => {
-    setStmt(null); setErrors([]); setAnswers({ accounts: {}, people: {} }); setOverrides({});
+    setStmt(null); setErrors([]); setAnswers({ accounts: {}, people: {} }); setOverrides({}); setPhotoTexts(null); setEdits({});
     setExtraCats({ Expenses: [], Income: [], Savings: [] }); setResult(null); setShowReady(false); setShowSkipped(false);
   };
 
+  const isPdf = (f) => /\.pdf$/i.test(f.name) || f.type === "application/pdf";
+  const isImage = (f) => /^image\//.test(f.type) || /\.(png|jpe?g|heic|heif|webp)$/i.test(f.name);
+  const alreadyImported = (fp) => {
+    const prior = imp.imports.find((i) => i.fp === fp);
+    if (!prior) return false;
+    setErrors([`${prior.kind === "photo" ? "These photos were" : "This statement was"} already imported on ${prior.at.slice(0, 10)} by ${prior.by}. To import again, undo that import first under History.`]);
+    setView("error"); return true;
+  };
+  const showPhotos = (texts, modes) => {
+    const st = SI.parsePhotos(texts, modes, localToday());
+    if (!st.rows.length) { setErrors(["Couldn't find any amounts in the photo. Try a sharper picture, or crop it to just the transactions."]); setView("error"); return; }
+    if (alreadyImported(st.fingerprint)) return;
+    setStmt(st); setView("review");
+  };
   const onFile = async (ev) => {
-    const f = ev.target.files?.[0]; ev.target.value = ""; if (!f) return;
-    reset(); setView("reading");
+    const files = Array.from(ev.target.files || []); ev.target.value = ""; if (!files.length) return;
+    reset(); setView("reading"); setReadingMsg("Reading…");
     try {
-      if (!/\.pdf$/i.test(f.name) && f.type !== "application/pdf") throw new Error("That file isn't a PDF. Choose the statement PDF you downloaded from the bank.");
+      if (files.every(isImage)) {
+        setReadingMsg("Loading the photo reader (first time only)…");
+        const texts = await SI.readImageTexts(files, (i, n, p) => setReadingMsg(`Reading photo ${i + 1} of ${n}… ${Math.round(p * 100)}%`));
+        setPhotoTexts(texts); showPhotos(texts, texts.map(() => "auto")); return;
+      }
+      if (files.length > 1 || !isPdf(files[0])) throw new Error("Choose one statement PDF, or one or more photos (screenshots or receipts). Not both at once.");
+      const f = files[0];
+      setReadingMsg("Reading the statement…");
       const lines = await SI.readPdfLines(f);
       const res = SI.parseStatement(lines);
       if (!res.ok) { setErrors(res.errors); setView("error"); return; }
-      const prior = imp.imports.find((i) => i.fp === res.statement.fingerprint);
-      if (prior) { setErrors([`This statement was already imported on ${prior.at.slice(0, 10)} by ${prior.by}. To import it again, undo that import first under History.`]); setView("error"); return; }
+      if (alreadyImported(res.statement.fingerprint)) return;
       setStmt(res.statement); setView("review");
     } catch (e) { setErrors([e?.message || String(e)]); setView("error"); }
   };
+
+  // Photo rows can be corrected in review; corrections are applied before categorizing, so memory and duplicates use them.
+  const stmtEff = useMemo(() => {
+    if (!stmt || !stmt.photo) return stmt;
+    return { ...stmt, rows: stmt.rows.map((r) => {
+      const e = edits[r.id]; if (!e) return r;
+      const abs = e.abs != null ? e.abs : Math.abs(r.amount);
+      const dir = e.dir || (r.amount < 0 ? "out" : "in");
+      const date = e.date || r.date;
+      return { ...r, desc: e.desc != null ? e.desc : r.desc, date, postDate: date, amount: dir === "out" ? -abs : abs, section: dir === "out" ? "withdrawals" : "deposits" };
+    }) };
+  }, [stmt, edits]);
+  const editRow = (id, patch) => setEdits((e) => ({ ...e, [id]: { ...(e[id] || {}), ...patch } }));
 
   /* ---- context the classifier sees: saved settings plus this session's answers ---- */
   const ctx = useMemo(() => {
     if (!stmt) return null;
     const cats = (t) => [...(state.categories[t] || []), ...extraCats[t]];
-    const self = { ...(imp.accounts[stmt.last4] || {}), ...(answers.accounts[stmt.last4] || {}), kind: stmt.kind, label: stmt.label, ours: true, statements: true };
+    const self = stmt.photo ? null : { ...(imp.accounts[stmt.last4] || {}), ...(answers.accounts[stmt.last4] || {}), kind: stmt.kind, label: stmt.label, ours: true, statements: true };
     return {
       categories: { Income: cats("Income"), Expenses: cats("Expenses"), Savings: cats("Savings") },
       entries: state.entries,
-      importer: { ...imp, accounts: { ...imp.accounts, ...answers.accounts, [stmt.last4]: self }, people: { ...imp.people, ...answers.people } },
+      importer: { ...imp, accounts: { ...imp.accounts, ...answers.accounts, ...(self ? { [stmt.last4]: self } : {}) }, people: { ...imp.people, ...answers.people } },
     };
   }, [stmt, state, answers, extraCats]);
 
   const cands = useMemo(() => {
     if (!ctx) return [];
-    return SI.classify(stmt, ctx).map((c) => {
+    return SI.classify(stmtEff, ctx).map((c) => {
       const o = overrides[c.id]; if (!o) return c;
       const x = { ...c };
       if (o.userSkip) { x.userSkip = true; x.rememberSkip = !!o.rememberSkip; }
@@ -2318,15 +2484,15 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
     setBusy(true);
     try {
       const importId = uid();
-      const built = SI.buildEntries(cands, stmt, ctx, importId, uid);
+      const built = SI.buildEntries(cands, stmtEff, ctx, importId, uid);
       const res = await commitImport({ stmt, importId, built, answers, extraCats, by: userName });
       if (res.aborted) { setErrors(["This statement was imported from another device while you were reviewing it. Nothing was added twice."]); setView("error"); return; }
-      setResult({ importId, count: built.entries.length, removed: built.removed.length, synced: res.ok, label: `${stmt.label} ····${stmt.last4}`, range: fmtRange(stmt.start, stmt.end) });
+      setResult({ importId, count: built.entries.length, removed: built.removed.length, synced: res.ok, label: stmt.photo ? stmt.label.toLowerCase() : `${stmt.label} ····${stmt.last4}`, range: fmtRange(stmt.start, stmt.end) });
       setView("done");
     } finally { setBusy(false); }
   };
 
-  const title = view === "history" ? "Import history" : view === "rules" ? "Import rules" : "Import a bank statement";
+  const title = view === "history" ? "Import history" : view === "rules" ? "Import rules" : "Import statements or photos";
 
   return (
     <div className="ap-imp-overlay" role="dialog" aria-modal="true" aria-label={title}>
@@ -2334,7 +2500,8 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
         <header className="ap-imp-head">
           <div>
             <h2 className="ap-imp-title">{title}</h2>
-            {view === "review" && stmt && <p className="ap-imp-sub">{SI.acctLabel(stmt.last4, stmt.kind, imp.accounts[stmt.last4] || { label: stmt.label })} · {fmtRange(stmt.start, stmt.end)} · <span className="ok">totals match the statement</span></p>}
+            {view === "review" && stmt && stmt.photo && <p className="ap-imp-sub">{stmt.label} · read on this device · <span className="warn">no totals to check, so look over amounts and dates</span></p>}
+            {view === "review" && stmt && !stmt.photo && <p className="ap-imp-sub">{SI.acctLabel(stmt.last4, stmt.kind, imp.accounts[stmt.last4] || { label: stmt.label })} · {fmtRange(stmt.start, stmt.end)} · <span className="ok">totals match the statement</span></p>}
           </div>
           <div className="ap-imp-headbtns">
             {(view === "pick" || view === "history" || view === "rules" || view === "done" || view === "error") && (
@@ -2348,19 +2515,20 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
           </div>
         </header>
 
-        <input ref={fileRef} type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={onFile} />
+        <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*" multiple style={{ display: "none" }} onChange={onFile} />
 
         {view === "pick" && (
           <div className="ap-imp-body ap-imp-pick">
             <p>Choose a Bank of America checking, savings or credit card statement PDF. It's read on this device; only the transactions you approve are saved.</p>
             <p className="ap-imp-fine">Picking a category for one transaction fills in the others from the same merchant on that statement, and it's remembered for next time.</p>
-            <button className="ap-imp-primary" onClick={() => fileRef.current?.click()}>Choose statement PDF</button>
+            <button className="ap-imp-primary" onClick={() => fileRef.current?.click()}>Choose PDF or photos</button>
+            <p className="ap-imp-fine">Photos: bank app screenshots or paper receipts, several at once. They're read on this iPad; nothing is uploaded anywhere.</p>
             <p className="ap-imp-fine">Nothing is added until you review it. Each statement can be imported once, and any import can be undone from History.</p>
             <StatementCoverage imp={imp} updateImporter={updateImporter} />
           </div>
         )}
 
-        {view === "reading" && <div className="ap-imp-body ap-imp-pick"><p>Reading the statement…</p></div>}
+        {view === "reading" && <div className="ap-imp-body ap-imp-pick"><p>{readingMsg || "Reading…"}</p></div>}
 
         {view === "error" && (
           <div className="ap-imp-body">
@@ -2375,6 +2543,20 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
 
         {view === "review" && ctx && (
           <>
+            {stmt.photo && photoTexts && (
+              <div className="ap-imp-body ap-imp-readas">
+                {photoTexts.map((_, pi) => (
+                  <div key={pi} className="ap-imp-readrow">
+                    <span>{photoTexts.length > 1 ? `Photo ${pi + 1}` : "This photo"} read as</span>
+                    <div className="ap-seg">
+                      {[["list", "Transaction list"], ["receipt", "Receipt"]].map(([m, l]) => (
+                        <button key={m} className={stmt.modes[pi] === m ? "on" : ""} onClick={() => { if (stmt.modes[pi] !== m) { const modes = stmt.modes.slice(); modes[pi] = m; setEdits({}); setOverrides({}); showPhotos(photoTexts, modes); } }}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="ap-imp-body">
               {pendingAccounts.length > 0 && (
                 <section className="ap-imp-group">
@@ -2404,7 +2586,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
               {groups["needs-category"].length > 0 && (
                 <section className="ap-imp-group">
                   <h3>Needs a category <span className="n">{groups["needs-category"].length}</span></h3>
-                  {groups["needs-category"].map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
+                  {groups["needs-category"].map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} editRow={editRow} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
                 </section>
               )}
 
@@ -2412,7 +2594,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                 <section className="ap-imp-group">
                   <h3>Possible duplicates <span className="n">{groups.duplicate.length}</span></h3>
                   <p className="ap-imp-hint">These match something already logged: same amount, within 3 days.</p>
-                  {groups.duplicate.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
+                  {groups.duplicate.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} editRow={editRow} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
                 </section>
               )}
 
@@ -2420,7 +2602,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                 <button className="ap-imp-toggle" onClick={() => setShowReady((v) => !v)} aria-expanded={showReady}>
                   <span>Ready to import <span className="n">{ready.length}</span></span><span className="chev">{showReady ? "Hide" : "Review"}</span>
                 </button>
-                {showReady && ready.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
+                {showReady && ready.map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} editRow={editRow} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
               </section>
 
               <section className="ap-imp-group">
@@ -2480,7 +2662,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
 
 function StatementCoverage({ imp, updateImporter }) {
   const byAcct = {};
-  imp.imports.forEach((i) => { (byAcct[i.acct] = byAcct[i.acct] || []).push(i); });
+  imp.imports.forEach((i) => { if (i.kind !== "photo") (byAcct[i.acct] = byAcct[i.acct] || []).push(i); });
   const ids = [...new Set([...Object.keys(byAcct), ...Object.entries(imp.accounts).filter(([, a]) => a.ours && a.statements).map(([id]) => id)])];
   if (!ids.length) return null;
   const today = localToday();
@@ -2570,7 +2752,21 @@ function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel })
   );
 }
 
-function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent }) {
+function PhotoEdit({ c, editRow }) {
+  const [amt, setAmt] = useState((Math.abs(c.amount) / 100).toFixed(2));
+  useEffect(() => { setAmt((Math.abs(c.amount) / 100).toFixed(2)); }, [c.amount]);
+  const commitAmt = () => { const v = Math.round(parseFloat(String(amt).replace(/[^0-9.]/g, "")) * 100); if (v > 0) editRow(c.id, { abs: v }); else setAmt((Math.abs(c.amount) / 100).toFixed(2)); };
+  return (
+    <div className="ap-imp-photoedit">
+      <input type="text" value={c.desc} onChange={(e) => editRow(c.id, { desc: e.target.value })} aria-label="Store or description" />
+      <input type="date" value={c.date} onChange={(e) => e.target.value && editRow(c.id, { date: e.target.value })} aria-label="Date" />
+      <input type="text" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} onBlur={commitAmt} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} aria-label="Amount" />
+      <button className="ap-imp-dir" onClick={() => editRow(c.id, { dir: c.dir === "out" ? "in" : "out" })} title="Switch between money out and money in">{c.dir === "out" ? "Money out ⇄" : "Money in ⇄"}</button>
+    </div>
+  );
+}
+
+function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent, editRow }) {
   const isMain = c.kind === "expense" || c.kind === "income";
   const type = c.dir === "out" ? "Expenses" : "Income";
   const value = c.userSkip ? (c.rememberSkip ? "__skipall" : "__skip") : c.category ? `${c.type}::${c.category}` : "";
@@ -2593,7 +2789,7 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent 
         <span className="m" title={c.desc}>{c.merchant}{c.memo && <span className="memo"> “{c.memo}”</span>}</span>
         <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.amount < 0 ? "−" : "+"}{centsFmt(c.amount)}</span>
       </div>
-      <div className="ap-imp-raw" title={c.desc}>{c.desc}</div>
+      {c.fromPhoto ? <PhotoEdit c={c} editRow={editRow} /> : <div className="ap-imp-raw" title={c.desc}>{c.desc}</div>}
       {(c.fx || c.feeMerged > 0) && <div className="ap-imp-why">{c.fx}{c.fx && c.feeMerged ? " · " : ""}{c.feeMerged > 0 && `includes ${fmt2(c.feeMerged / 100)} foreign fee`}</div>}
 
       {isMain && (
@@ -2642,7 +2838,7 @@ function ImportHistory({ imports, undoImport }) {
       {imports.map((i) => (
         <div key={i.id} className="ap-imp-hist">
           <div>
-            <b>{i.label} ····{i.acct}</b>
+            <b>{i.kind === "photo" ? `${i.label} (read from photos)` : `${i.label} ····${i.acct}`}</b>
             <div className="ap-imp-fine">{fmtRange(i.start, i.end)} · {i.count} entries · imported {i.at.slice(0, 10)} by {i.by}</div>
           </div>
           <button className="ap-imp-secondary" onClick={() => { if (confirm(`Undo the ${i.label} ····${i.acct} import? Its ${i.count} entries are removed, including any edits made to them since.`)) undoImport(i.id); }}>Undo</button>
@@ -3086,6 +3282,15 @@ function Styles() {
   .ap-avg{font-family:'JetBrains Mono';font-size:10.5px;color:var(--teal);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline dotted;}
   .ap-footlink{font-family:'JetBrains Mono';font-size:12px;color:var(--navy);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;}
   .ap-plan-actions button:disabled{opacity:.5;cursor:not-allowed;}
+
+  .ap-imp-sub .warn{color:#8A5A00;font-weight:600;}
+  .ap-imp-readas{padding-bottom:0;}
+  .ap-imp-readrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:8px;}
+  .ap-imp-photoedit{display:grid;grid-template-columns:minmax(140px,1fr) 150px 96px auto;gap:6px;margin:8px 0 0 58px;}
+  .ap-imp-photoedit input{font-family:'Archivo';font-size:13px;border:1.5px solid var(--line);border-radius:7px;padding:6px 8px;background:var(--paper2);color:var(--ink);min-width:0;}
+  .ap-imp-photoedit input:focus{border-color:var(--navy);outline:none;}
+  .ap-imp-dir{font-family:'Archivo';font-weight:600;font-size:12px;border:1.5px solid var(--line);background:var(--paper2);border-radius:7px;padding:5px 9px;cursor:pointer;color:var(--ink);white-space:nowrap;}
+  @media(max-width:600px){ .ap-imp-photoedit{grid-template-columns:1fr 1fr;margin-left:0;} }
 
   /* statement import */
   .ap-iobtn.strong{background:var(--navy);color:var(--paper2);border-color:var(--navy);}
