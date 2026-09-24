@@ -395,23 +395,48 @@ window.addEventListener("error", function(e){
       const out = [];
       for (let i = 0; i < files.length; i++) {
         current = i; if (onProgress) onProgress(i, files.length, 0);
-        const { data } = await worker.recognize(await imageToCanvas(files[i]));
-        out.push((data && data.text) || "");
+        const { data } = await worker.recognize(await imageToCanvas(files[i]), {}, { text: true, tsv: true });
+        out.push(data && data.tsv ? tsvToText(data.tsv) : ((data && data.text) || ""));
       }
       return out;
     } finally { await worker.terminate(); }
   }
 
+  // Tesseract reads a two-column screen (descriptions | amounts) as separate blocks. Rebuild the rows the eye sees:
+  // group words whose vertical centers line up, then read each row left to right.
+  function tsvToText(tsv) {
+    const words = [];
+    String(tsv).split("\n").forEach((row) => {
+      const c = row.split("\t");
+      if (c.length < 12 || c[0] !== "5") return;
+      const text = c.slice(11).join(" ").trim();
+      if (text) words.push({ x: +c[6], y: +c[7], w: +c[8], h: +c[9], text });
+    });
+    words.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+    const rows = [];
+    for (const w of words) {
+      const cy = w.y + w.h / 2;
+      let best = null, bestD = Infinity;
+      for (let k = rows.length - 1; k >= 0 && k >= rows.length - 4; k--) {
+        const d = Math.abs(rows[k].cy - cy);
+        if (d <= Math.max(rows[k].h, w.h) * 0.6 && d < bestD) { best = rows[k]; bestD = d; }
+      }
+      if (best) { best.words.push(w); best.cy = (best.cy * best.n + cy) / (best.n + 1); best.n++; best.h = Math.max(best.h, w.h); }
+      else rows.push({ cy, h: w.h, n: 1, words: [w] });
+    }
+    return rows.sort((a, b) => a.cy - b.cy).map((r) => r.words.sort((a, b) => a.x - b.x).map((w) => w.text).join(" ")).join("\n");
+  }
+
   const MON3 = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12 };
   // OCR often reads "$" as "S"; amounts must end in two decimals.
-  const MONEY_RX = /(?:^|\s)((?:[-\u2212\u2013]\s?)?[$S]?\s?\d{1,3}(?:,\d{3})*[.,]\d{2}|(?:[-\u2212\u2013]\s?)?[$S]?\s?\d+[.,]\d{2})(?=\s|$)/g;
+  const MONEY_RX = /(?:^|\s)((?:[-+\u2212\u2013\u2014\u201c\u201d"'~]\s?)?[$S]?\s?\d{1,3}(?:,\d{3})*[.,]\d{2}|(?:[-+\u2212\u2013\u2014\u201c\u201d"'~]\s?)?[$S]?\s?\d+[.,]\d{2})(?=\s|$)/g;
   function moneyTokens(line) {
     const out = []; let m; MONEY_RX.lastIndex = 0;
     while ((m = MONEY_RX.exec(line))) {
-      const tok = m[1], neg = /^[-\u2212\u2013]/.test(tok);
+      const tok = m[1], neg = /^[-\u2212\u2013\u2014\u201c\u201d"'~]/.test(tok), signed = /^[-+\u2212\u2013\u2014\u201c\u201d"'~]/.test(tok), dollar = /\$/.test(tok);
       const digits = tok.replace(/[^\d.,]/g, ""), cut = digits.length - 3;
       const cents = parseInt(digits.slice(0, cut).replace(/[.,]/g, "") || "0", 10) * 100 + parseInt(digits.slice(cut + 1), 10);
-      if (!isNaN(cents)) out.push({ tok, cents, neg });
+      if (!isNaN(cents)) out.push({ tok, cents, neg, signed, dollar });
     }
     return out;
   }
@@ -429,7 +454,8 @@ window.addEventListener("error", function(e){
     return null;
   }
   const INFLOW_RX = /deposit|payroll|refund|\bcredit\b|zelle (payment )?from|transfer from|interest|cash ?back|received|reversal/i;
-  const clean = (s) => s.replace(/[|_~•·]+/g, " ").replace(/\s+/g, " ").replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, "").trim();
+  const clean = (s) => s.replace(/[|_~•·]+/g, " ").replace(/show more transactions?.*$/i, " ").replace(/\s+/g, " ")
+    .replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, "").replace(/^[a-z]\s+|\s+[a-z]$/g, "").replace(/^(?:CCD|PPD|WEB)\s+|\s+(?:CCD|PPD|WEB)$/g, "").trim();
   const looksReceipt = (text) => /\btotal\b/i.test(text);
 
   function parsePhotoList(text, pi, todayIso) {
@@ -457,6 +483,50 @@ window.addEventListener("error", function(e){
     });
     return rows;
   }
+  const BLOCK_HEAD = /^(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})|Processing|Pending)\b\s*/i;
+  const isBlockLayout = (text) => text.split(/\n/).filter((l) => BLOCK_HEAD.test(l.trim())).length >= 2;
+  function parsePhotoBlocks(text, pi, todayIso) {
+    const blocks = [];
+    text.split(/\n/).map((t) => t.trim()).filter(Boolean).forEach((line) => {
+      const h = line.match(BLOCK_HEAD);
+      if (h) {
+        const date = h[1] ? iso(+h[3], MON3[h[1].toLowerCase()], +h[2]) : todayIso;
+        blocks.push({ date, parts: [line.slice(h[0].length)] });
+      } else if (blocks.length) blocks[blocks.length - 1].parts.push(line);
+      // anything above the first date line (headers, "Available balance") is ignored
+    });
+    const rows = [];
+    blocks.forEach((b) => {
+      const text2 = b.parts.join(" ").replace(/amount may change.*?merchant/i, " ");
+      const money = moneyTokens(text2);
+      const amt = money.find((m) => m.signed);                          // transaction amounts carry a sign
+      const bal = money.find((m) => !m.signed && m.dollar && m !== amt);  // running balance: unsigned, with "$"
+      let desc = text2; money.forEach((m) => { desc = desc.replace(m.tok, " "); });
+      desc = clean(desc);
+      if (!/[A-Za-z]{3}/.test(desc)) return;         // a date line with no transaction (cut off at the screen edge)
+      let date = b.date;
+      const emb = desc.match(/\b(\d{2})\/(\d{2})\b/);   // purchase date inside the description (e.g. "09/06 PURCHASE")
+      if (emb && validMD(+emb[1], +emb[2])) { const d = inferYear(+emb[1], +emb[2], b.date, 0); const gap = dayDiff(b.date, d); if (gap >= 0 && gap <= 20) date = d; }
+      const amount = amt ? (amt.neg ? -amt.cents : amt.cents) : 0;
+      rows.push({ id: `p${pi}-${rows.length}`, photo: pi, fromPhoto: true, desc, amount, balance: bal ? bal.cents : null, needsAmount: !amt,
+        date, postDate: b.date, section: amount > 0 ? "deposits" : "withdrawals" });
+    });
+    // Rows are newest first: amount = this balance - the next (older) row's balance. Use it to fill or check.
+    for (let k = 0; k < rows.length - 1; k++) {
+      const r = rows[k], older = rows[k + 1];
+      if (r.balance == null || older.balance == null) continue;
+      const expected = r.balance - older.balance;
+      if (!expected) continue;
+      if (r.needsAmount) { r.amount = expected; r.needsAmount = false; r.fromBalance = true; r.section = expected > 0 ? "deposits" : "withdrawals"; }
+      else if (r.amount !== expected) r.amountHint = expected;
+    }
+    // One misread balance throws off two neighbouring checks by equal and opposite amounts: that's the balance, not the amounts.
+    for (let k = 0; k < rows.length - 1; k++) {
+      const a = rows[k], b = rows[k + 1];
+      if (a.amountHint && b.amountHint && (a.amount - a.amountHint) === -(b.amount - b.amountHint)) { a.amountHint = null; b.amountHint = null; }
+    }
+    return rows;
+  }
   function parsePhotoReceipt(text, pi, todayIso) {
     const lines = text.split(/\n/).map((t) => t.trim()).filter(Boolean);
     const store = clean((lines.find((l) => (l.match(/[A-Za-z]/g) || []).length >= 3 && !/welcome|receipt|thank|customer copy|store #|tel|phone|www\./i.test(l)) || "Receipt").replace(/[^A-Za-z0-9&' .\-]/g, " "));
@@ -475,7 +545,26 @@ window.addEventListener("error", function(e){
   // texts: OCR text per photo. modes: per photo "auto" | "list" | "receipt".
   function parsePhotos(texts, modes, todayIso) {
     const used = texts.map((t, i) => (modes && modes[i] && modes[i] !== "auto") ? modes[i] : (looksReceipt(t) ? "receipt" : "list"));
-    const rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso) : parsePhotoList(t, i, todayIso));
+    let rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso) : isBlockLayout(t) ? parsePhotoBlocks(t, i, todayIso) : parsePhotoList(t, i, todayIso));
+    // Overlapping screenshots repeat rows. A row counts once when it also appears in an EARLIER photo;
+    // identical rows inside the same photo are separate real purchases (two $5.25 coffees) and are all kept.
+    const seenIn = new Map();
+    rows = rows.filter((r) => {
+      const k = `${r.postDate}|${r.amount}|${r.desc.toUpperCase().replace(/[^A-Z0-9]/g, "")}`;
+      const photos = seenIn.get(k) || new Set();
+      if ([...photos].some((p) => p !== r.photo)) return false;
+      photos.add(r.photo); seenIn.set(k, photos); return true;
+    });
+    // fold "INTERNATIONAL TRANSACTION FEE 09/06 CN TOWER ..." into the matching purchase, as with statements
+    rows = rows.filter((r) => {
+      const m = r.desc.match(/^INTERNATIONAL TRANSACTION FEE\s+(?:\d{2}\/\d{2}\s+)?(.+)$/i);
+      if (!m || r.amount >= 0) return true;
+      const words = m[1].toUpperCase().split(/\s+/).filter((w) => /^[A-Z&'.\-]+$/.test(w)).slice(0, 3);
+      const p = words.length && rows.find((x) => x !== r && x.amount < 0 && !/^INTERNATIONAL TRANSACTION FEE/i.test(x.desc)
+        && words.every((w) => x.desc.toUpperCase().split(/\s+/).includes(w)));
+      if (!p) return true;
+      p.amount += r.amount; p.feeMerged = (p.feeMerged || 0) - r.amount; return false;
+    });
     const dates = rows.map((r) => r.date).sort();
     let h = 5381; const all = texts.join("\n"); for (let i = 0; i < all.length; i++) h = ((h << 5) + h + all.charCodeAt(i)) | 0;
     return { bank: "photo", kind: "photo", photo: true, label: texts.length > 1 ? `${texts.length} photos` : "Photo", last4: null,
@@ -494,7 +583,7 @@ window.addEventListener("error", function(e){
       .replace(/\bRECURRING\b/g, " ");
     let toks = t.split(/\s+/).filter(Boolean)
       .filter((w) => /[A-Z0-9]/.test(w))                                // stray punctuation like a lone "#"
-      .filter((w) => !/^\d+$/.test(w))                                 // bare numbers
+      .filter((w) => !/^\d+$/.test(w) && !/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(w))  // bare numbers and dates
       .filter((w) => !(/\d/.test(w) && /[A-Z]/.test(w) && w.length >= 6)); // order ids like 5H96A99Y2
     if (toks.length > 1 && STATES.has(toks[toks.length - 1])) toks.pop();
     return toks.slice(0, 5);
@@ -517,12 +606,12 @@ window.addEventListener("error", function(e){
     }
     // "ALDI 71046 07/05 #000913500 MOBILE PURCHASE 608 QUINCE ORCHAR ..." — the store name is the part before the date;
     // what follows "PURCHASE" is sometimes the store's street address.
-    const pre = u.match(/^(.+?)\s+\d{2}\/\d{2}\s+#\d+\s+(?:MOBILE\s+)?PURCHASE\b/);
+    const pre = u.match(/^(.+?)\s+\d{2}\/\d{2}\s+(?:#\d+\s+)?(?:MOBILE\s+)?PURCHASE\b/);
     if (pre) { const pt = cleanTokens(pre[1]); if (pt.length) return { key: pt.join(" "), name: titleCase(pt.slice(0, 4).join(" ")) }; }
     let body = u;
     const mp = u.match(/MOBILE PURCHASE\s+(?!\d{4}\b)(.+)$/);                // "BEST BUY #293 08/08 #0007 MOBILE PURCHASE BEST BUY #293 ..."
     if (mp) body = mp[1];
-    body = body.replace(/^(?:MOBILE PURCHASE|PURCHASE REFUND|PURCHASE|CHECKCARD|PMNT SENT)\s+\d{4}\s+/, "");
+    body = body.replace(/^(?:MOBILE PURCHASE|PURCHASE REFUND|PURCHASE|CHECKCARD|PMNT SENT)\s+\d{2}\/?\d{2}\s+/, "").replace(/\s+ON\s+\d{2}\/\d{2}$/, "");
     const toks = cleanTokens(body);
     const key = toks.join(" ");
     return { key: key || null, name: titleCase(toks.slice(0, 4).join(" ")) || desc };
@@ -621,9 +710,10 @@ window.addEventListener("error", function(e){
     rows.forEach((r) => new Set(r.desc.toUpperCase().match(TOK) || []).forEach((t) => { tokCount[t] = (tokCount[t] || 0) + 1; }));
     const orderToks = (desc) => [...new Set(desc.toUpperCase().match(TOK) || [])].filter((t) => tokCount[t] <= 2);
 
-    const cands = rows.filter((r) => !merged.has(r.id) && r.amount !== 0).map((r) => {
+    const cands = rows.filter((r) => !merged.has(r.id) && (r.amount !== 0 || r.needsAmount)).map((r) => {
       const mi = merchantInfo(r.desc);
-      const c = { id: r.id, date: r.date, desc: r.desc, amount: r.amount, dir: r.amount < 0 ? "out" : "in",
+      const c = { id: r.id, date: r.date, desc: r.desc, amount: r.amount, dir: r.amount < 0 || r.needsAmount ? "out" : "in",
+        needsAmount: !!r.needsAmount, amountHint: r.amountHint || null, fromBalance: !!r.fromBalance,
         merchant: mi.name, key: mi.ambiguous ? null : mi.key, memo: mi.memo || null, person: mi.person || null, fromPhoto: !!r.fromPhoto, fx: r.fx || null, feeMerged: r.feeMerged || 0,
         orderTok: orderToks(r.desc),
         section: r.section, kind: null, skipReason: null, type: null, category: null, source: null,
@@ -729,6 +819,7 @@ window.addEventListener("error", function(e){
   }
 
   function findDuplicate(c, entries) {
+    if (c.needsAmount) return;
     if (c.kind !== "expense" && c.kind !== "income" && c.kind !== "savings-only") return;
     const amt = c.kind === "savings-only" ? c.savingsDelta : Math.abs(c.amount);
     const type = c.kind === "savings-only" ? "Savings" : c.dir === "out" ? "Expenses" : "Income";
@@ -741,6 +832,7 @@ window.addEventListener("error", function(e){
     if (c.userSkip) return "skipped";
     if (c.kind === "pending") return "needs-account";
     if (c.kind === "skip") return "skipped";
+    if (c.needsAmount) return "needs-amount";
     if (c.savingsDelta && !rowSavingsCategory(c, ctx)) return "needs-savings";
     if (c.dupOf && !c.dupDecision) return "duplicate";
     if (c.dupOf && c.dupDecision === "skip") return "skipped";
@@ -790,7 +882,7 @@ window.addEventListener("error", function(e){
   }
 
   const api = { toCents, fmtC, itemsToLines, readPdfLines, loadPdfJs, detect, parseStatement, merchantInfo, findRule,
-    keywordCategory, counterpartyOf, classify, readImageTexts, parsePhotos, loadTesseract, statusOf, savingsCategory, rowSavingsCategory, buildEntries, acctLabel, PDFJS_VERSION };
+    keywordCategory, counterpartyOf, classify, readImageTexts, parsePhotos, loadTesseract, tsvToText, statusOf, savingsCategory, rowSavingsCategory, buildEntries, acctLabel, PDFJS_VERSION };
   root.StmtImport = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -827,7 +919,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-24 (photos)";
+const APP_VERSION = "2026-09-24 (photos v2)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2331,7 +2423,7 @@ const importerOf = (state) => ({ ...EMPTY_IMPORTER, ...(state.importer || {}) })
 const shortDate = (d) => { const [, m, dd] = d.split("-"); return `${MLABEL[+m - 1]} ${+dd}`; };
 const fmtRange = (a, b) => `${shortDate(a)} – ${shortDate(b)}, ${b.slice(0, 4)}`;
 const centsFmt = (c) => fmt2(Math.abs(c) / 100);
-const GROUP_ORDER = ["needs-account", "needs-savings", "needs-category", "duplicate", "ready", "skipped"];
+const GROUP_ORDER = ["needs-account", "needs-savings", "needs-amount", "needs-category", "duplicate", "ready", "skipped"];
 
 function ImportSheet({ state, userName, commitImport, undoImport, updateImporter, onClose }) {
   const [view, setView] = useState("pick");          // pick | reading | error | review | done | history | rules
@@ -2404,9 +2496,11 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
     return { ...stmt, rows: stmt.rows.map((r) => {
       const e = edits[r.id]; if (!e) return r;
       const abs = e.abs != null ? e.abs : Math.abs(r.amount);
-      const dir = e.dir || (r.amount < 0 ? "out" : "in");
+      const dir = e.dir || (r.amount < 0 || r.needsAmount ? "out" : "in");
       const date = e.date || r.date;
-      return { ...r, desc: e.desc != null ? e.desc : r.desc, date, postDate: date, amount: dir === "out" ? -abs : abs, section: dir === "out" ? "withdrawals" : "deposits" };
+      const fixed = e.abs != null;
+      return { ...r, desc: e.desc != null ? e.desc : r.desc, date, postDate: date, amount: dir === "out" ? -abs : abs, section: dir === "out" ? "withdrawals" : "deposits",
+        needsAmount: r.needsAmount && !fixed, amountHint: fixed ? null : r.amountHint };
     }) };
   }, [stmt, edits]);
   const editRow = (id, patch) => setEdits((e) => ({ ...e, [id]: { ...(e[id] || {}), ...patch } }));
@@ -2477,7 +2571,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
     t.entries += (c.kind === "expense" || c.kind === "income" ? 1 : 0) + (c.savingsDelta ? 1 : 0);
     return t;
   }, { exp: 0, inc: 0, sav: 0, entries: 0 });
-  const remaining = groups["needs-account"].length + groups["needs-savings"].length + groups["needs-category"].length + groups.duplicate.length;
+  const remaining = groups["needs-amount"].length + groups["needs-account"].length + groups["needs-savings"].length + groups["needs-category"].length + groups.duplicate.length;
 
   const doImport = async () => {
     if (remaining > 0 || busy) return;
@@ -2580,6 +2674,14 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                     </label>
                   ))}
                   <p className="ap-imp-hint">You can still change it on individual transfers below.</p>
+                </section>
+              )}
+
+              {groups["needs-amount"].length > 0 && (
+                <section className="ap-imp-group">
+                  <h3>Needs an amount <span className="n">{groups["needs-amount"].length}</span></h3>
+                  <p className="ap-imp-hint">The amount on these couldn't be read clearly. Type it in from the screenshot.</p>
+                  {groups["needs-amount"].map((c) => <ReviewRow key={c.id} c={c} ctx={ctx} frequent={frequent} editRow={editRow} setOv={setOv} pickFor={pickFor} markBetween={markBetween} addCategory={addCategory} />)}
                 </section>
               )}
 
@@ -2753,14 +2855,15 @@ function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel })
 }
 
 function PhotoEdit({ c, editRow }) {
-  const [amt, setAmt] = useState((Math.abs(c.amount) / 100).toFixed(2));
-  useEffect(() => { setAmt((Math.abs(c.amount) / 100).toFixed(2)); }, [c.amount]);
-  const commitAmt = () => { const v = Math.round(parseFloat(String(amt).replace(/[^0-9.]/g, "")) * 100); if (v > 0) editRow(c.id, { abs: v }); else setAmt((Math.abs(c.amount) / 100).toFixed(2)); };
+  const shown = c.needsAmount ? "" : (Math.abs(c.amount) / 100).toFixed(2);
+  const [amt, setAmt] = useState(shown);
+  useEffect(() => { setAmt(shown); }, [c.amount, c.needsAmount]);
+  const commitAmt = () => { const v = Math.round(parseFloat(String(amt).replace(/[^0-9.]/g, "")) * 100); if (v > 0) editRow(c.id, { abs: v }); else setAmt(shown); };
   return (
     <div className="ap-imp-photoedit">
       <input type="text" value={c.desc} onChange={(e) => editRow(c.id, { desc: e.target.value })} aria-label="Store or description" />
       <input type="date" value={c.date} onChange={(e) => e.target.value && editRow(c.id, { date: e.target.value })} aria-label="Date" />
-      <input type="text" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} onBlur={commitAmt} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} aria-label="Amount" />
+      <input type="text" inputMode="decimal" value={amt} placeholder="amount" className={c.needsAmount ? "missing" : ""} onChange={(e) => setAmt(e.target.value)} onBlur={commitAmt} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} aria-label="Amount" />
       <button className="ap-imp-dir" onClick={() => editRow(c.id, { dir: c.dir === "out" ? "in" : "out" })} title="Switch between money out and money in">{c.dir === "out" ? "Money out ⇄" : "Money in ⇄"}</button>
     </div>
   );
@@ -2787,9 +2890,11 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent,
       <div className="ap-imp-rowmain">
         <span className="d mono">{shortDate(c.date)}</span>
         <span className="m" title={c.desc}>{c.merchant}{c.memo && <span className="memo"> “{c.memo}”</span>}</span>
-        <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.amount < 0 ? "−" : "+"}{centsFmt(c.amount)}</span>
+        <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.needsAmount ? "?" : (c.amount < 0 ? "−" : "+") + centsFmt(c.amount)}</span>
       </div>
       {c.fromPhoto ? <PhotoEdit c={c} editRow={editRow} /> : <div className="ap-imp-raw" title={c.desc}>{c.desc}</div>}
+      {c.amountHint && <div className="ap-imp-check">The balances on the screenshot say this should be {fmt2(Math.abs(c.amountHint) / 100)}. <button className="ap-imp-link" onClick={() => editRow(c.id, { abs: Math.abs(c.amountHint), dir: c.amountHint < 0 ? "out" : "in" })}>Use {fmt2(Math.abs(c.amountHint) / 100)}</button></div>}
+      {c.fromBalance && <div className="ap-imp-why">Amount worked out from the running balances on the screenshot.</div>}
       {(c.fx || c.feeMerged > 0) && <div className="ap-imp-why">{c.fx}{c.fx && c.feeMerged ? " · " : ""}{c.feeMerged > 0 && `includes ${fmt2(c.feeMerged / 100)} foreign fee`}</div>}
 
       {isMain && (
@@ -3291,6 +3396,10 @@ function Styles() {
   .ap-imp-photoedit input:focus{border-color:var(--navy);outline:none;}
   .ap-imp-dir{font-family:'Archivo';font-weight:600;font-size:12px;border:1.5px solid var(--line);background:var(--paper2);border-radius:7px;padding:5px 9px;cursor:pointer;color:var(--ink);white-space:nowrap;}
   @media(max-width:600px){ .ap-imp-photoedit{grid-template-columns:1fr 1fr;margin-left:0;} }
+
+  .ap-imp-photoedit input.missing{border-color:var(--clay);}
+  .ap-imp-check{margin:6px 0 0 58px;font-size:12.5px;color:#6B4700;background:#FBF0D9;border-radius:7px;padding:6px 9px;}
+  @media(max-width:600px){ .ap-imp-check{margin-left:0;} }
 
   /* statement import */
   .ap-iobtn.strong{background:var(--navy);color:var(--paper2);border-color:var(--navy);}
