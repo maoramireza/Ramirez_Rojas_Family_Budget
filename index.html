@@ -461,7 +461,10 @@ window.addEventListener("error", function(e){
     return null;
   }
   const INFLOW_RX = /deposit|payroll|refund|\bcredit\b|zelle (payment )?from|transfer from|interest|cash ?back|received|reversal/i;
-  const clean = (s) => s.replace(/[|_~•·]+/g, " ").replace(/show more transactions?.*$/i, " ").replace(/\s+/g, " ")
+  const clean = (s) => s.replace(/[|_~•·;]+/g, " ").replace(/show more transactions?.*$/i, " ").replace(/eligible for a custom pay plan/ig, " ")
+    .replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\b.*?\b20\d\d\b.*$/i, " ")   // half-visible next row at the screen edge
+    .replace(/(?:\s+[a-z]{1,2})+$/, "")                                                            // stray lowercase letters at the end
+    .replace(/\s+/g, " ")
     .replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, "").replace(/^[a-z]\s+|\s+[a-z]$/g, "").replace(/^(?:CCD|PPD|WEB)\s+|\s+(?:CCD|PPD|WEB)$/g, "").trim();
   const looksReceipt = (text) => /\btotal\b/i.test(text);
 
@@ -582,6 +585,17 @@ window.addEventListener("error", function(e){
   function parsePhotos(texts, modes, todayIso, types) {
     const used = texts.map((t, i) => (modes && modes[i] && modes[i] !== "auto") ? modes[i] : (looksReceipt(t) ? "receipt" : "list"));
     const acct = texts.map((t, i) => (types && types[i] && types[i] !== "auto") ? types[i] : detectAcctType(t));
+    // A scrolled screenshot may not show the card's name. Card screens give themselves away anyway: purchases carry
+    // no "-" and the balance (what you owe) goes UP with each one. Read as debit, those purchases would all come out
+    // as "money in". If that's what a debit read produces, it's a card.
+    texts.forEach((t, i) => {
+      if ((types && types[i] && types[i] !== "auto") || acct[i] !== "debit" || used[i] === "receipt" || !isBlockLayout(t)) return;
+      if (DEBIT_RX.test(t)) return;                                  // the screen says it's a bank account
+      const asDebit = parsePhotoBlocks(t, i, todayIso, false).filter((r) => !r.needsAmount);
+      const looksIn = asDebit.filter((r) => r.amount > 0 && !INFLOW_RX.test(r.desc)).length;
+      const out = asDebit.filter((r) => r.amount < 0).length;
+      if (looksIn >= 3 && looksIn > out * 2) acct[i] = "card";
+    });
     let rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso)
       : isBlockLayout(t) ? parsePhotoBlocks(t, i, todayIso, acct[i] === "card") : parsePhotoList(t, i, todayIso, acct[i] === "card"));
     // Overlapping screenshots repeat rows. A row counts once when it also appears in an EARLIER photo;
@@ -593,16 +607,33 @@ window.addEventListener("error", function(e){
       if ([...photos].some((p) => p !== r.photo)) return false;
       photos.add(r.photo); seenIn.set(k, photos); return true;
     });
-    // fold "INTERNATIONAL TRANSACTION FEE 09/06 CN TOWER ..." into the matching purchase, as with statements
-    rows = rows.filter((r) => {
-      const m = r.desc.match(/^INTERNATIONAL TRANSACTION FEE\s+(?:\d{2}\/\d{2}\s+)?(.+)$/i);
-      if (!m || r.amount >= 0) return true;
-      const words = m[1].toUpperCase().split(/\s+/).filter((w) => /^[A-Z&'.\-]+$/.test(w)).slice(0, 3);
-      const p = words.length && rows.find((x) => x !== r && x.amount < 0 && !/^INTERNATIONAL TRANSACTION FEE/i.test(x.desc)
-        && words.every((w) => x.desc.toUpperCase().split(/\s+/).includes(w)));
-      if (!p) return true;
-      p.amount += r.amount; p.feeMerged = (p.feeMerged || 0) - r.amount; return false;
+    // Fold foreign-transaction fees into their purchase, as with statements.
+    //  - "INTERNATIONAL TRANSACTION FEE 09/06 CN TOWER ..." names the purchase.
+    //  - "CARGO POR TRANSACCIÓN EXTRANJERA" (Spanish app) names nothing: it's ~3% of the purchase listed right below it.
+    const FEE_RX = /^(?:INTERNATIONAL TRANSACTION FEE|FOREIGN TRANSACTION FEE|CARGO POR TRANSACCI[OÓ]N EXTRANJERA|COMISI[OÓ]N POR TRANSACCI[OÓ]N EXTRANJERA)\b\s*(?:\d{2}\/\d{2}\s+)?(.*)$/i;
+    const isFee = (x) => FEE_RX.test(x.desc);
+    const threePct = (p, f) => Math.abs(Math.round(Math.abs(p.amount) * 0.03) - Math.abs(f.amount)) <= 2;
+    const nearDate = (a, b) => Math.abs(dayDiff(a.postDate, b.postDate)) <= 2;
+    const taken = new Set(), drop = new Set();
+    rows.forEach((r, idx) => {
+      const m = r.desc.match(FEE_RX);
+      if (!m || r.amount >= 0 || r.needsAmount) return;
+      const ok = (x) => x && x !== r && !isFee(x) && x.amount < 0 && !x.needsAmount && !taken.has(x);
+      const words = m[1].toUpperCase().split(/\s+/).filter((w) => /^[A-Z&'.\-]{2,}$/.test(w)).slice(0, 3);
+      let p = null;
+      if (words.length) p = rows.find((x) => ok(x) && words.every((w) => x.desc.toUpperCase().split(/\s+/).includes(w)));
+      const below = rows[idx + 1];
+      const lastOnScreen = !below || below.photo !== r.photo;
+      if (!p && !lastOnScreen && ok(below) && nearDate(below, r) && threePct(below, r)) p = below;
+      if (!p && lastOnScreen) {
+        // fee at the bottom edge of a screenshot: its purchase is the top row of another screenshot
+        const firstRows = rows.filter((x, k) => k === 0 || rows[k - 1].photo !== x.photo);
+        p = firstRows.find((x) => ok(x) && x.photo !== r.photo && nearDate(x, r) && threePct(x, r)) || null;
+      }
+      if (!p) { r.desc = "Foreign transaction fee"; return; }
+      p.amount += r.amount; p.feeMerged = (p.feeMerged || 0) - r.amount; taken.add(p); drop.add(r);
     });
+    rows = rows.filter((r) => !drop.has(r));
     const dates = rows.map((r) => r.date).sort();
     let h = 5381; const all = texts.join("\n"); for (let i = 0; i < all.length; i++) h = ((h << 5) + h + all.charCodeAt(i)) | 0;
     return { bank: "photo", kind: "photo", photo: true, label: texts.length > 1 ? `${texts.length} photos` : "Photo", last4: null,
@@ -958,7 +989,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-24 (photos v4, cards)";
+const APP_VERSION = "2026-09-29 (photos v5, cards auto)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2577,15 +2608,25 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
   }, [cands, ctx]);
 
   const setOv = (id, patch) => setOverrides((o) => ({ ...o, [id]: patch === null ? undefined : { ...(o[id] || {}), ...patch } }));
-  const pickFor = (c, patch) => setOverrides((o) => {
-    const next = { ...o, [c.id]: { ...(o[c.id] || {}), ...patch } };
-    if (c.key) cands.forEach((x) => {
-      const own = o[x.id];
-      if (x.id !== c.id && x.key === c.key && x.dir === c.dir && (x.kind === "expense" || x.kind === "income") && !(own && (own.category || own.userSkip)))
-        next[x.id] = { ...(own || {}), ...patch };
+  const pickFor = (c, patch) => {
+    const group = [c];
+    setOverrides((o) => {
+      const next = { ...o, [c.id]: { ...(o[c.id] || {}), ...patch } };
+      if (c.key) cands.forEach((x) => {
+        const own = o[x.id];
+        if (x.id !== c.id && x.key === c.key && x.dir === c.dir && (x.kind === "expense" || x.kind === "income") && !(own && (own.category || own.userSkip))) {
+          next[x.id] = { ...(own || {}), ...patch }; group.push(x);
+        }
+      });
+      return next;
     });
-    return next;
-  });
+    // On a photo, direction is read, not reconciled. An expense category means money out; an income category, money in.
+    const want = patch.type === "Expenses" ? "out" : patch.type === "Income" ? "in" : null;
+    if (want) {
+      const flip = group.filter((x) => x.fromPhoto && x.dir !== want).map((x) => x.id);
+      if (flip.length) setEdits((e) => { const n = { ...e }; flip.forEach((id) => { n[id] = { ...(n[id] || {}), dir: want }; }); return n; });
+    }
+  };
   const answerAccount = (id, patch) => setAnswers((a) => ({ ...a, accounts: { ...a.accounts, [id]: { ...(imp.accounts[id] || {}), ...(a.accounts[id] || {}), ...patch } } }));
   const markBetween = (person) => setAnswers((a) => ({ ...a, people: { ...a.people, [person]: "household" } }));
   const addCategory = (type) => {
@@ -2872,7 +2913,7 @@ function AccountPrompt({ acct, onAnswer }) {
   );
 }
 
-function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel }) {
+function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel, other }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ql = q.trim().toLowerCase();
@@ -2880,6 +2921,8 @@ function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel })
   const top = ql ? [] : frequent.filter((o) => options.includes(o));
   const rest = options.filter((o) => (ql ? o.toLowerCase().includes(ql) : !top.includes(o)));
   if (ql) rest.sort((a, b) => rank(a) - rank(b));
+  // other = { type, label, options }: the opposite direction's categories, shown underneath and in search results
+  const otherMatches = other ? other.options.filter((o) => (ql ? o.toLowerCase().includes(ql) : true)) : [];
   const pick = (v) => { onPick(v); setOpen(false); setQ(""); };
   const item = (v, label, cls) => <li key={cls + v} className={cls} onMouseDown={(e) => { e.preventDefault(); pick(v); }}>{label}</li>;
   return (
@@ -2887,14 +2930,16 @@ function CatPicker({ valueLabel, options, frequent, extras, onPick, ariaLabel })
       <input type="text" className={valueLabel ? "" : "empty"} value={open ? q : valueLabel} placeholder="Type to find a category…" aria-label={ariaLabel}
         onFocus={() => { setOpen(true); setQ(""); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={(e) => { if (e.key === "Enter" && ql && rest[0]) { pick(rest[0]); e.target.blur(); } if (e.key === "Escape") { setOpen(false); e.target.blur(); } }} />
+        onKeyDown={(e) => { if (e.key === "Enter" && ql && (rest[0] || otherMatches[0])) { pick(rest[0] || `${other.type}::${otherMatches[0]}`); e.target.blur(); } if (e.key === "Escape") { setOpen(false); e.target.blur(); } }} />
       {open && (
         <ul className="ap-combo-list">
           {top.length > 0 && <li className="hd">Most used</li>}
           {top.map((o) => item(o, o, "t"))}
           {top.length > 0 && rest.length > 0 && <li className="hd">All categories</li>}
           {rest.map((o) => item(o, o, ""))}
-          {ql && rest.length === 0 && <li className="none">No category matches “{q}”</li>}
+          {otherMatches.length > 0 && <li className="hd">{other.label}</li>}
+          {otherMatches.map((o) => item(`${other.type}::${o}`, o, "o"))}
+          {ql && rest.length === 0 && otherMatches.length === 0 && <li className="none">No category matches “{q}”</li>}
           <li className="hd">Other</li>
           {extras.map(([v, l]) => item(v, l, "x"))}
         </ul>
@@ -2956,7 +3001,8 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent,
             valueLabel={c.userSkip ? (c.rememberSkip ? "Don't import (always)" : "Don't import") : (value ? c.category : "")}
             options={ctx.categories[type]} frequent={(frequent && frequent[type]) || []}
             extras={[["__new", "New category…"], ...(c.person ? [["__between", "Money between us (skip)"]] : []), ["__skip", "Don't import"], ...(c.key && !c.person ? [["__skipall", "Don't import, always skip this"]] : [])]}
-            onPick={(v) => onPick(v.startsWith("__") ? v : `${type}::${v}`)} />
+            other={c.fromPhoto ? { type: type === "Expenses" ? "Income" : "Expenses", label: type === "Expenses" ? "Income categories (makes it money in)" : "Expense categories (makes it money out)", options: ctx.categories[type === "Expenses" ? "Income" : "Expenses"] } : null}
+            onPick={(v) => onPick(v.startsWith("__") || v.includes("::") ? v : `${type}::${v}`)} />
           {tag && <span className="ap-imp-tag">{tag}</span>}
         </div>
       )}
@@ -3410,6 +3456,7 @@ function Styles() {
 
   .ap-combo-list li.hd{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);padding:8px 11px 3px;cursor:default;background:none;}
   .ap-combo-list li.x{color:var(--navy);font-weight:600;}
+  .ap-combo-list li.o{color:var(--ink-soft);}
   .ap-catpick{min-width:250px;flex:1;max-width:340px;}
   .ap-catpick input.empty{border-color:var(--clay);}
   .ap-catpick .ap-combo-list{max-height:330px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
