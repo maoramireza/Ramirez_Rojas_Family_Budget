@@ -1282,7 +1282,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-30 (touch pass)";
+const APP_VERSION = "2026-09-30 (traffic lights)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2129,85 +2129,183 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
   const everyday = envelopes.filter((e) => variableCats.has(e.c) && e.budget > 0);
   const evBudget = everyday.reduce((a, e) => a + e.budget, 0), evSpent = everyday.reduce((a, e) => a + e.spent, 0);
 
+  // ---- traffic lights: red = over (or spending with no budget), yellow = 85%+ used or running ahead of the calendar, green = fine
+  const light = (e) => {
+    if (e.budget <= 0) return e.spent > 0 ? { s: "red", why: "no budget set" } : { s: "green" };
+    if (Math.round(e.spent) > Math.round(e.budget)) return { s: "red" };
+    const r = e.spent / e.budget;
+    if (r >= 0.85) return { s: "yellow", why: `${Math.round(r * 100)}% used` };
+    if (elapsed != null && variableCats.has(e.c) && r >= 0.25 && r > elapsed + 0.1) return { s: "yellow", why: `${Math.round(r * 100)}% used, ${Math.round(elapsed * 100)}% of the month gone` };
+    return { s: "green" };
+  };
+  const RANK = { red: 0, yellow: 1, green: 2 };
+  const match = (c) => !q || c.toLowerCase().includes(q.toLowerCase());
+  const kindC = (c) => state.categories.Expenses.includes(c) ? kindOf(state, c, dAuto) : "flex";
+  const itemsOf = (c) => monthEntries.filter((x) => x.type === "Expenses" && x.category === c);
+  const everyRows = envelopes.filter((e) => kindC(e.c) === "flex").map((e) => ({ e, l: light(e) }))
+    .sort((a, b) => RANK[a.l.s] - RANK[b.l.s] || (b.e.spent / (b.e.budget || 1)) - (a.e.spent / (a.e.budget || 1)));
+  const counts = { red: 0, yellow: 0, green: 0 }; everyRows.forEach((r) => counts[r.l.s]++);
+  const attention = everyRows.filter((r) => r.l.s !== "green" && match(r.e.c));
+  const fine = everyRows.filter((r) => r.l.s === "green" && match(r.e.c));
+  const bills = envelopes.filter((e) => kindC(e.c) !== "flex");
+  const billsShown = bills.filter((e) => match(e.c));
+  const withBudget = bills.filter((e) => e.budget > 0);
+  const paid = withBudget.filter((e) => e.spent >= e.budget * 0.95).length;
+  const billsDue = withBudget.reduce((a, e) => a + Math.max(0, e.budget - e.spent), 0);
+  const billsHigh = withBudget.filter((e) => Math.round(e.spent - e.budget) > Math.max(2, e.budget * 0.05)).length;
+  const evB = everyRows.reduce((a, r) => a + r.e.budget, 0), evS = everyRows.reduce((a, r) => a + r.e.spent, 0);
+  const daysLeft = elapsed != null ? daysBetween(today, period.to) + 1 : null;
+  const overall = remaining < 0 ? "red" : (usedPct >= 85 || counts.red > 0) ? "yellow" : "green";
+  const savSpent = spentBy("Savings"), incSpent = spentBy("Income");
+  const savDone = Object.values(savSpent).reduce((a, v) => a + v, 0), incDone = Object.values(incSpent).reduce((a, v) => a + v, 0);
+  const [openLine, setOpenLine] = useState({});
+  const toggleLine = (k) => setOpenLine((o) => ({ ...o, [k]: !o[k] }));
+  const [showFine, setShowFine] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const row = ({ e, l }) => <CatRow key={e.c} env={e} light={l} items={itemsOf(e.c)} defDate={period.defaultDate} addEntry={addEntry} onDelete={deleteEntry} />;
+
   return (
     <>
-      <section className="ap-summary">
-        <Stat label="Planned income" val={incBudget} color="var(--emerald)" />
-        <Stat label="Budgeted" val={expBudget} />
-        <Stat label="Spent" val={spentTotal} color="var(--clay)" />
-        <Stat label="Left to spend" val={remaining} color={remaining < 0 ? "var(--clay)" : "var(--ink)"} hero />
+      <section className={"ap-hero s-" + overall}>
+        <div className="ap-hero-top">
+          <div>
+            <div className="ap-hero-lbl">Left to spend{n === 1 ? ` in ${MLABEL[+period.months[0].slice(5) - 1]}` : ""}</div>
+            <div className="ap-hero-val">{remaining < 0 ? `${fmt(-remaining)} over` : fmt(remaining)}</div>
+          </div>
+          <div className="ap-hero-side">
+            <div>{fmt(spentTotal)} of {fmt(expBudget)}</div>
+            {daysLeft && evB - evS > 0 && <div>{daysLeft > 1 ? `Everyday: ${fmt((evB - evS) / daysLeft)}/day for ${daysLeft} days` : `Everyday: ${fmt(evB - evS)} left today`}</div>}
+          </div>
+        </div>
+        <div className="ap-track ap-paced"><div className="ap-fill" style={{ width: Math.min(usedPct, 100) + "%" }} />
+          {elapsed != null && <i className="ap-today" style={{ left: (elapsed * 100) + "%" }} title="Today" />}</div>
+        <div className="ap-lights" aria-label="Everyday categories">
+          {counts.red > 0 && <span className="ap-light red"><LightIcon s="red" /> {counts.red} over</span>}
+          {counts.yellow > 0 && <span className="ap-light yellow"><LightIcon s="yellow" /> {counts.yellow} close</span>}
+          <span className="ap-light green"><LightIcon s="green" /> {counts.green} on track</span>
+        </div>
       </section>
       {(n > 1 || !isWholeMonths(period)) && (
         <p className="ap-rangenote">Showing <b>{period.label}</b>. Budgets count whole months ({n === 1 ? monthLabel(period.months[0]) : `${n} months, ${monthLabel(period.months[0])} to ${monthLabel(period.months[n - 1])}`}); spending counts only the dates in the range.</p>
       )}
-
       {monthGaps.length > 0 && (
         <div className="ap-partialnote">
           <b>{period.label} isn't complete yet.</b> Not imported: {monthGaps.slice(0, 3).map((g) => gapLabel(state, g)).join("; ")}{monthGaps.length > 3 ? `; and ${monthGaps.length - 3} more` : ""}. Income and spending from those dates aren't counted yet.
         </div>
       )}
 
-      <div className="ap-overall">
-        <div className="ap-overall-top">
-          <span>{usedPct.toFixed(0)}% of budget used</span>
-          <span className="mono">{fmt(spentTotal)} / {fmt(expBudget)}</span>
+      <div className="ap-dashbar">
+        <button className="ap-logbtn" onClick={() => setLogOpen(true)}>+ Log</button>
+        <div className="ap-envsearch">
+          <input type="text" placeholder="Find a category…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a category" />
+          {q && <button onClick={() => setQ("")} aria-label="Clear">×</button>}
         </div>
-        <div className="ap-track ap-track-lg">
-          <div className="ap-fill" style={{ width: Math.min(usedPct, 100) + "%",
-            background: usedPct > 100 ? "var(--clay)" : usedPct > 85 ? "var(--navy)" : "var(--emerald)" }} />
-        </div>
-        {elapsed !== null && evBudget > 0 && (() => {
-          const used = evSpent / evBudget, ahead = used > elapsed + 0.08;
-          return <div className={"ap-note ap-pacenote" + (ahead ? " warn" : "")}>Everyday spending ({everyday.length === 1 ? everyday[0].c : `${everyday.length} categories`}): <b>{Math.round(used * 100)}%</b> spent with <b>{Math.round(elapsed * 100)}%</b> of {period.label} gone. {ahead ? "Spending is running ahead of the calendar." : "On pace."}</div>;
-        })()}
-        {savBudget > 0 && <div className="ap-note">Plan sets aside <b>{fmt(savBudget)}</b> to savings · unallocated {fmt(incBudget - expBudget - savBudget)}</div>}
       </div>
 
-      <AddBar state={state} defDate={period.defaultDate} addEntry={addEntry} />
-
-      <div className="ap-envsearch">
-        <input type="text" placeholder="Search expense categories…" value={q} onChange={(e) => setQ(e.target.value)} />
-        {q && <button onClick={() => setQ("")}>×</button>}
+      <div className="ap-llist">
+        {attention.map(row)}
+        {(q || showFine) && fine.map(row)}
+        {!q && fine.length > 0 && (
+          <button className="ap-lmore" onClick={() => setShowFine(!showFine)} aria-expanded={showFine}>
+            <LightIcon s="green" /><span className="nm">{showFine ? "Hide the ones on track" : attention.length ? `${fine.length} more on track` : `All ${fine.length} on track`}</span><span className="amt">{showFine ? "Hide" : "Show"}</span>
+          </button>
+        )}
+        {envelopes.length === 0 && <p className="ap-empty">No expense budget or spending for {period.label}. Set one in Planning.</p>}
+        {q && !attention.length && !fine.length && !billsShown.length && !unbudgeted.some(match) && <p className="ap-empty">No expense category matches "{q}".</p>}
       </div>
 
-      {(() => {
-        const shown = envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase()));
-        const kindC = (c) => state.categories.Expenses.includes(c) ? kindOf(state, c, dAuto) : "flex";
-        const card = (e, compact) => <Envelope key={e.c} env={e} compact={compact}
-            items={monthEntries.filter((x) => x.type === "Expenses" && x.category === e.c)}
-            defDate={period.defaultDate} addEntry={addEntry}
-            onDelete={deleteEntry} buckets={buckets} elapsed={elapsed} everyday={variableCats.has(e.c)} periodLabel={period.label} />;
-        const every = shown.filter((e) => kindC(e.c) === "flex"), bills = shown.filter((e) => kindC(e.c) !== "flex");
-        const bBudget = bills.reduce((a, e) => a + e.budget, 0), bSpent = bills.reduce((a, e) => a + e.spent, 0);
-        const paid = bills.filter((e) => e.budget > 0 && e.spent >= e.budget * 0.95).length;
-        return (<>
-          {every.length > 0 && bills.length > 0 && <h3 className="ap-envgroup">Everyday <span className="mono">{fmt(every.reduce((a, e) => a + e.spent, 0))} of {fmt(every.reduce((a, e) => a + e.budget, 0))}</span></h3>}
-          {every.length > 0 && <section className="ap-env-grid">{every.map((e) => card(e, false))}</section>}
-          {bills.length > 0 && <>
-            <h3 className="ap-envgroup">Bills &amp; non-monthly <span className="mono">{paid} of {bills.filter((e) => e.budget > 0).length} paid · {fmt(bSpent)} of {fmt(bBudget)}</span></h3>
-            <section className="ap-billlist">{bills.map((e) => card(e, true))}</section>
-          </>}
-        </>);
-      })()}
-      <section className="ap-env-grid">
-        {envelopes.length === 0 && <p className="ap-loading">No expense budget or spending for {period.label}. Set one in Planning.</p>}
-        {envelopes.length > 0 && envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).length === 0 && !unbudgeted.some((c) => c.toLowerCase().includes(q.toLowerCase())) && <p className="ap-loading">No expense category matches "{q}".</p>}
-      </section>
-      {(() => { const list = unbudgeted.filter((c) => !q || c.toLowerCase().includes(q.toLowerCase())); return list.length > 0 && (
+      <div className="ap-llist ap-lines">
+        {bills.length > 0 && (!q || billsShown.length > 0) && <>
+          <button className="ap-line" onClick={() => toggleLine("bills")} aria-expanded={!!(openLine.bills || q)}>
+            <span className="nm">Bills<span className="sub">{paid} of {withBudget.length} paid{billsDue > 0 ? ` · ${fmt(billsDue)} still due` : ""}{billsHigh ? ` · ${billsHigh} higher than planned` : ""}</span></span>
+            <span className="chev" aria-hidden="true">{openLine.bills || q ? "▴" : "▾"}</span>
+          </button>
+          {(openLine.bills || q) && <div className="ap-billlist">{billsShown.map((e) => <Envelope key={e.c} env={e} compact items={itemsOf(e.c)} defDate={period.defaultDate} addEntry={addEntry} onDelete={deleteEntry} buckets={buckets} periodLabel={period.label} />)}</div>}
+        </>}
+        {!q && <>
+          <button className="ap-line" onClick={() => toggleLine("sav")} aria-expanded={!!openLine.sav}>
+            <span className="nm">Savings</span><span className="amt">{fmt(savDone)} of {fmt(savBudget)} saved</span><span className="chev" aria-hidden="true">{openLine.sav ? "▴" : "▾"}</span>
+          </button>
+          {openLine.sav && <MiniPanel title="" rows={state.categories.Savings} planAmt={(c) => planAmt("Savings", c)} spent={savSpent} accent="teal" verb="saved" />}
+          <button className="ap-line" onClick={() => toggleLine("inc")} aria-expanded={!!openLine.inc}>
+            <span className="nm">Income</span><span className="amt">{fmt(incDone)} of {fmt(incBudget)} received</span><span className="chev" aria-hidden="true">{openLine.inc ? "▴" : "▾"}</span>
+          </button>
+          {openLine.inc && <MiniPanel title="" rows={state.categories.Income} planAmt={(c) => planAmt("Income", c)} spent={incSpent} accent="emerald" verb="received" />}
+        </>}
+      </div>
+
+      {(() => { const list = unbudgeted.filter(match); return list.length > 0 && (
         <div className="ap-unbud">
           <button className="ap-imp-toggle" onClick={() => setShowUnbud(!showUnbud)} aria-expanded={showUnbud || !!q}>
             <span>Not budgeted in {period.label} <span className="n">{list.length}</span></span><span className="chev">{showUnbud || q ? "Hide" : "Show"}</span>
           </button>
           {(showUnbud || q) && <div className="ap-unbud-body">
-            <p>No budget and no spending yet, so they have no card. Spending in them still counts.</p>
+            <p>No budget and no spending yet. Spending in them still counts.</p>
             <div className="ap-unbud-chips">{list.map((c) => <span key={c}>{c}</span>)}</div>
             {goPlan && <button className="ap-imp-secondary" onClick={goPlan}>Budget them in Planning</button>}
           </div>}
         </div>); })()}
 
-      <MiniPanel title="Savings" rows={state.categories.Savings} planAmt={(c) => planAmt("Savings", c)} spent={spentBy("Savings")} accent="teal" verb="saved" />
-      <MiniPanel title="Income received" rows={state.categories.Income} planAmt={(c) => planAmt("Income", c)} spent={spentBy("Income")} accent="emerald" verb="received" />
+      {logOpen && (
+        <Sheet title="Log a transaction" label="Log a transaction" onClose={() => setLogOpen(false)}>
+          <AddBar state={state} defDate={period.defaultDate} addEntry={addEntry} onDone={() => setLogOpen(false)} />
+        </Sheet>
+      )}
     </>
+  );
+}
+
+function LightIcon({ s }) {
+  const p = s === "red" ? <><circle cx="8" cy="8" r="6.5" /><path d="M8 4.8v3.6M8 11.1v.1" /></>
+    : s === "yellow" ? <><path d="M8 2.2l6.2 11H1.8z" /><path d="M8 6.4v3M8 11.4v.1" /></>
+    : <><circle cx="8" cy="8" r="6.5" /><path d="M5.3 8.2l1.9 1.9 3.6-3.8" /></>;
+  return <svg className={"ap-licon " + s} viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{p}</svg>;
+}
+
+// One category in the traffic-light list. Tap it to see its transactions and log one.
+function CatRow({ env, light, items, defDate, addEntry, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [amt, setAmt] = useState("");
+  const [note, setNote] = useState("");
+  const submit = () => {
+    const a = parseMoney(amt); if (!a) return;
+    addEntry({ id: uid(), date: defDate, type: "Expenses", category: env.c, amount: a, note: note.trim() });
+    setAmt(""); setNote("");
+  };
+  const over = env.spent - env.budget;
+  const pct = env.budget > 0 ? Math.min(100, (env.spent / env.budget) * 100) : (env.spent > 0 ? 100 : 0);
+  const right = env.budget <= 0 ? `${fmt(env.spent)} spent` : Math.round(over) > 0 ? `${fmt(over)} over` : `${fmt(-over)} left`;
+  return (
+    <div className={"ap-lrow s-" + light.s + (open ? " open" : "")}>
+      <button className="ap-lrow-main" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <LightIcon s={light.s} />
+        <span className="nm"><span className="t">{env.c}{items.length > 0 && <em className="ap-cnt">{items.length}</em>}</span>
+          {light.why && <span className="sub">{light.why}</span>}
+          <span className="ap-lbar"><i style={{ width: pct + "%" }} /></span></span>
+        <span className="amt">{right}</span>
+      </button>
+      {open && (
+        <div className="ap-lrow-more">
+          <div className="ap-imp-fine" style={{ margin: "0 0 8px" }}>{fmt2(env.spent)} spent of {fmt(env.budget)} budgeted</div>
+          {env.note && <div className="ap-envnote">{env.note}</div>}
+          <div className="ap-envform">
+            <span className="cur">$</span>
+            <input className="amt" type="text" inputMode="decimal" enterKeyHint="done" onFocus={selectAll} placeholder="0.00" value={amt}
+              onChange={(e) => setAmt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} aria-label={`Amount for ${env.c}`} />
+            <input className="note" type="text" placeholder="note (optional)" value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+            <button className="ap-envgo" onClick={submit}>Log</button>
+          </div>
+          {items.length > 0 && (
+            <ul className="ap-env-items">
+              {items.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((x) => (
+                <li key={x.id}><span className="d">{niceDate(x.date).replace(/^\w+, /, "")}</span><span className="n">{x.note || x.name || "—"}</span>
+                  <span className="a mono">{fmt2(x.amount)}</span><button className="x" onClick={() => onDelete(x.id)} title="Delete (you can Undo)" aria-label="Delete">×</button></li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2319,7 +2417,7 @@ function MiniPanel({ title, rows, planAmt, spent, accent, verb }) {
   if (list.length===0) return null;
   return (
     <section className="ap-mini">
-      <h3 className="ap-mini-t">{title}</h3>
+      {title && <h3 className="ap-mini-t">{title}</h3>}
       <div className="ap-mini-rows">
         {list.map((c)=>{
           const target = planAmt(c), got = spent[c]||0;
@@ -2365,9 +2463,10 @@ function Combo({ value, onChange, options, placeholder, top }) {
   );
 }
 
-function AddBar({ state, defDate, addEntry }) {
+function AddBar({ state, defDate, addEntry, onDone }) {
   const [type, setType] = useState("Expenses");
-  const [category, setCategory] = useState(state.categories.Expenses[0] || "");
+  // Start on the category logged most often, not whatever happens to be first in the list.
+  const [category, setCategory] = useState((topUsed(state, "Expenses") || [])[0] || state.categories.Expenses[0] || "");
   const dflt = () => defDate;
   const [date, setDate] = useState(dflt());
   const [amount, setAmount] = useState("");
@@ -2376,12 +2475,13 @@ function AddBar({ state, defDate, addEntry }) {
   useEffect(()=>{ setDate(dflt()); }, [defDate]);
   const cats = state.categories[type] || [];
   const buckets = Object.keys(state.buckets || {});
-  useEffect(()=>{ if (!cats.includes(category)) setCategory(cats[0]||""); }, [type]);
+  useEffect(()=>{ if (!cats.includes(category)) setCategory((topUsed(state, type) || [])[0] || cats[0] || ""); }, [type]);
 
   const add = () => {
     const amt = parseFloat(amount); if (!amt || amt<=0 || !category) return;
     addEntry({ id: uid(), date, type, category, amount: Math.round(amt*100)/100, note: note.trim(), bucket: (type==="Expenses"&&bucket&&bucket!=="No bucket")?bucket:undefined });
     setAmount(""); setNote(""); setBucket("");
+    if (onDone) onDone();
   };
   return (
     <div className="ap-addbar">
@@ -4750,6 +4850,62 @@ function Styles() {
     .ap-filtbar .ap-iobtn{grid-column:span 3;}
     .ap-filtbar .ap-iobtn.strong{grid-column:1/-1;}
     .ap-filtbar .ap-count{grid-column:1/-1;}
+  }
+
+  /* dashboard: traffic lights */
+  .ap-hero{background:var(--paper2);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px 12px;margin-bottom:12px;}
+  .ap-hero-top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+  .ap-hero-lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  .ap-hero-val{font-family:'Fraunces',serif;font-size:38px;font-weight:500;line-height:1.05;}
+  .ap-hero.s-red .ap-hero-val{color:var(--clay);}
+  .ap-hero-side{text-align:right;font-size:12.5px;color:var(--ink-soft);line-height:1.5;font-family:'JetBrains Mono';}
+  .ap-hero .ap-track{height:8px;}
+  .ap-hero.s-green .ap-fill{background:var(--emerald);}
+  .ap-hero.s-yellow .ap-fill{background:#D39A1E;}
+  .ap-hero.s-red .ap-fill{background:var(--clay);}
+  .ap-lights{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .ap-light{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;border-radius:8px;padding:4px 9px;}
+  .ap-light.red{background:#FBEAE8;color:var(--clay);}
+  .ap-light.yellow{background:#FBF0D9;color:#8A5A00;}
+  .ap-light.green{background:#E7F1EA;color:var(--emerald);}
+  .ap-licon{flex:none;}
+  .ap-licon.red{color:var(--clay);} .ap-licon.yellow{color:#B07400;} .ap-licon.green{color:var(--emerald);}
+  .ap-dashbar{display:flex;gap:8px;margin-bottom:10px;align-items:stretch;}
+  .ap-dashbar .ap-envsearch{flex:1;margin:0;}
+  .ap-logbtn{font-family:'Archivo';font-weight:700;font-size:14px;background:var(--navy);color:var(--paper2);border:none;border-radius:10px;padding:0 16px;cursor:pointer;min-height:40px;}
+  .ap-llist{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;}
+  .ap-llist:empty{display:none;}
+  .ap-llist .ap-empty{padding:12px 14px;margin:0;}
+  .ap-lrow{border-bottom:1px solid var(--line);}
+  .ap-lrow:last-child{border-bottom:none;}
+  .ap-lrow-main,.ap-lmore,.ap-line{width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;background:none;border:none;border-bottom:1px solid var(--line);cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);}
+  .ap-lrow-main{border-bottom:none;}
+  .ap-lmore:last-child,.ap-line:last-child{border-bottom:none;}
+  .ap-lrow-main .nm,.ap-lmore .nm,.ap-line .nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .ap-lrow-main .t{font-size:14.5px;font-weight:600;}
+  .ap-lrow-main .sub{font-size:11.5px;color:#8A5A00;}
+  .ap-lrow.s-red .sub{color:var(--clay);}
+  .ap-lrow-main .amt,.ap-lmore .amt,.ap-line .amt{font-family:'JetBrains Mono';font-size:13px;white-space:nowrap;color:var(--ink-soft);}
+  .ap-lrow.s-red .amt{color:var(--clay);font-weight:600;}
+  .ap-lbar{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:4px;}
+  .ap-lbar i{display:block;height:100%;border-radius:2px;background:var(--emerald);}
+  .ap-lrow.s-yellow .ap-lbar i{background:#D39A1E;}
+  .ap-lrow.s-red .ap-lbar i{background:var(--clay);}
+  .ap-lrow.open{background:#fff;}
+  .ap-lrow-more{padding:0 14px 12px 40px;}
+  .ap-lmore .nm{font-size:14px;color:var(--ink-soft);font-weight:600;}
+  .ap-line .nm{font-size:14.5px;font-weight:600;}
+  .ap-line .sub{font-size:12px;font-weight:400;color:var(--ink-soft);font-family:'JetBrains Mono';}
+  .ap-line .chev{color:var(--ink-soft);font-size:12px;width:12px;}
+  .ap-lines .ap-billlist{border:none;border-radius:0;margin:0;border-bottom:1px solid var(--line);background:#fff;}
+  .ap-lines .ap-mini{margin:0;border-bottom:1px solid var(--line);}
+  .ap-lines .ap-mini-rows{border:none;border-radius:0;background:#fff;}
+  .ap-psheet .ap-addbar{border:none;padding:0;background:none;box-shadow:none;}
+  @media(max-width:600px){
+    .ap-hero-val{font-size:34px;}
+    .ap-hero-side{text-align:left;}
+    .ap-lrow-more{padding-left:14px;}
+    .ap-line .amt{white-space:normal;text-align:right;font-size:12px;}
   }
   `}</style>);
 }
