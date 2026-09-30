@@ -508,16 +508,23 @@ window.addEventListener("error", function(e){
     return null;
   }
   // the app's own menus and notes, in English and Spanish: never part of a transaction
+  const END_LINE = /Legal info and disclosures|divulgaciones legales|Informaci[oó]n y divulgaciones|Investment, insurance and annuity|Productos de inversi[oó]n|Bank of America, N\.A\. Member FDIC/i;
   const CHROME_LINE = /Pay\s*&\s*Transfer|Deposit Checks|Pagar y Transferir|Depositar cheques|Show more transactions|Mostrar m[aá]s transacciones|Search transactions|Buscar transacciones|Available balance|Saldo disponible|Current balance|Saldo actual|Now viewing|All Transactions|Todas las transacciones|C[oó]mo podemos ayudar|Ofrecido por/i;
   // Credit card screens flip the signs: purchases show with no sign (they add to what you owe), payments/refunds show "-".
-  const CARD_RX = /tarjeta de cr[eé]dito|saldo del estado de cuenta|pago m[ií]nimo|cr[eé]dito disponible|credit card|statement balance|minimum payment|available credit|visa|mastercard|amex|american express|customized cash|travel rewards|premium rewards|unlimited cash|cash rewards/i;
+  const CARD_RX = /customi[sz]e|signature|rewards|tarjeta de cr[eé]dito|saldo del estado de cuenta|pago m[ií]nimo|cr[eé]dito disponible|credit card|statement balance|minimum payment|available credit|visa|mastercard|amex|american express|customized cash|travel rewards|premium rewards|unlimited cash|cash rewards/i;
   const DEBIT_RX = /available balance|checking|savings|debit|tarjeta d[eé]bito|saldo disponible|cuenta de cheques|ahorros/i;
   const detectAcctType = (text) => (CARD_RX.test(text) && !DEBIT_RX.test(text) ? "card" : "debit");
   const CARD_IN_RX = /payment|thank you|refund|return|credit|cash ?back|reversal|\bpago\b|reembolso|devoluci[oó]n|cr[eé]dito|abono/i;
-  const isBlockLayout = (text) => text.split(/\n/).filter((l) => parseHead(l.trim(), "2000-01-01")).length >= 2;
+  // Bank-app layout: a date (or "Pending") line starts each transaction; amount first, running balance under it.
+  // One such line is enough: a screenshot of a single transaction must never fall back to line-by-line reading,
+  // which pairs a store with the balance on its line.
+  const isBlockLayout = (text) => text.split(/\n/).some((l) => parseHead(l.trim(), "2000-01-01"));
   function parsePhotoBlocks(text, pi, todayIso, card) {
     const blocks = [];
+    let ended = false;
     text.split(/\n/).map((t) => t.trim()).filter(Boolean).forEach((line) => {
+      if (ended) return;
+      if (END_LINE.test(line)) { ended = true; return; }   // legal text and anything after it is not transactions
       if (CHROME_LINE.test(line)) {                   // menus, search boxes, balance headers
         // a menu below the list ends it; drop the icon row just above it (symbols, no real words)
         const last = blocks[blocks.length - 1];
@@ -601,9 +608,18 @@ window.addEventListener("error", function(e){
     return [{ id: `p${pi}-0`, photo: pi, fromPhoto: true, desc: store || "Receipt", amount: -total, date: dt, postDate: dt, section: "withdrawals" }];
   }
   // texts: OCR text per photo. modes: per photo "auto" | "list" | "receipt".
-  function parsePhotos(texts, modes, todayIso, types) {
+  function parsePhotos(texts, modes, todayIso, types, known) {
     const used = texts.map((t, i) => (modes && modes[i] && modes[i] !== "auto") ? modes[i] : (looksReceipt(t) ? "receipt" : "list"));
     const acct = texts.map((t, i) => (types && types[i] && types[i] !== "auto") ? types[i] : detectAcctType(t));
+    // The title bar usually ends with the account's last 4 digits ("Customize…ture - 3687"). If the app already knows
+    // that account from a statement or an earlier answer, its kind settles it.
+    texts.forEach((t, i) => {
+      if ((types && types[i] && types[i] !== "auto") || !known) return;
+      const head = t.split(/\n/).slice(0, 6).join(" ");
+      const m = head.match(/[-\u2013\u2014]\s*(\d{4})\b/);
+      const k = m && known[m[1]];
+      if (k && k.kind) acct[i] = k.kind === "card" ? "card" : "debit";
+    });
     // A scrolled screenshot may not show the card's name. Card screens give themselves away anyway: purchases carry
     // no "-" and the balance (what you owe) goes UP with each one. Read as debit, those purchases would all come out
     // as "money in". If that's what a debit read produces, it's a card.
@@ -1012,7 +1028,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-29 (photos v6, español)";
+const APP_VERSION = "2026-09-29 (photos v7, remove)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2125,7 +2141,7 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
                   {(x.type==="Income") !== (x.amount<0) ? "+" : "−"}{fmt2(Math.abs(x.amount))}</td>
                 <td className="rowacts">
                   <button className="ap-rowbtn" onClick={()=>setEditId(x.id)}>Edit</button>
-                  <button className="ap-rowbtn del" onClick={()=>deleteEntry(x.id)}>×</button>
+                  <button className="ap-rowbtn del" aria-label="Delete" onClick={()=>{ if (confirm(`Delete ${x.category} ${fmt2(Math.abs(x.amount))} on ${x.date}?\n\nIf you delete it by mistake, restore it from Backups at the bottom of the app.`)) deleteEntry(x.id); }}><span className="lbl">Delete</span><span className="x">×</span></button>
                 </td>
               </tr>
             ))}
@@ -2558,7 +2574,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
     setView("error"); return true;
   };
   const showPhotos = (texts, modes, types) => {
-    const st = SI.parsePhotos(texts, modes, localToday(), types);
+    const st = SI.parsePhotos(texts, modes, localToday(), types, imp.accounts);
     if (!st.rows.length) { setErrors(["Couldn't find any amounts in the photo. Try a sharper picture, or crop it to just the transactions."]); setView("error"); return; }
     if (alreadyImported(st.fingerprint)) return;
     setStmt(st); setView("review");
@@ -2832,9 +2848,9 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
                       <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.amount < 0 ? "−" : "+"}{centsFmt(c.amount)}</span>
                     </div>
                     <div className="ap-imp-why">
-                      {c.userSkip ? "You chose not to import this" : c.dupDecision === "skip" ? "Skipped as a duplicate" : c.skipReason}
+                      {c.userSkip ? "You removed this" : c.dupDecision === "skip" ? "Skipped as a duplicate" : c.skipReason}
                       {c.removeRefunded && c.refundOf && <> · also removes the earlier {fmt2(c.refundOf.amount)} purchase <button className="ap-imp-link" onClick={() => setOv(c.id, { keepRefunded: true })}>Keep it</button></>}
-                      {(c.userSkip || c.dupDecision === "skip") && <button className="ap-imp-link" onClick={() => setOv(c.id, { userSkip: false, rememberSkip: false, dupDecision: null })}>Undo</button>}
+                      {(c.userSkip || c.dupDecision === "skip") && <button className="ap-imp-link" onClick={() => setOv(c.id, { userSkip: false, rememberSkip: false, dupDecision: null })}>Put it back</button>}
                     </div>
                   </div>
                 ))}
@@ -2993,7 +3009,7 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent,
   const value = c.userSkip ? (c.rememberSkip ? "__skipall" : "__skip") : c.category ? `${c.type}::${c.category}` : "";
   const onPick = (v) => {
     if (!v) return;
-    if (v === "__skip") return setOv(c.id, { userSkip: true, rememberSkip: false });
+    if (v === "__skip") return setOv(c.id, { userSkip: true, rememberSkip: false });   // same as the Remove button
     if (v === "__skipall") return pickFor(c, { userSkip: true, rememberSkip: true });
     if (v === "__between") return markBetween(c.person);
     if (v === "__new") { const name = addCategory(type); if (name) pickFor(c, { type, category: name, userSkip: false, rememberSkip: false }); return; }
@@ -3009,6 +3025,8 @@ function ReviewRow({ c, ctx, setOv, pickFor, markBetween, addCategory, frequent,
         <span className="d mono">{shortDate(c.date)}</span>
         <span className="m" title={c.desc}>{c.merchant}{c.memo && <span className="memo"> “{c.memo}”</span>}</span>
         <span className={"a mono " + (c.amount < 0 ? "out" : "in")}>{c.needsAmount ? "?" : (c.amount < 0 ? "−" : "+") + centsFmt(c.amount)}</span>
+        <button className="ap-imp-remove" onClick={() => setOv(c.id, { userSkip: true, rememberSkip: false })}
+          aria-label={`Remove ${c.merchant}`} title={c.fromPhoto ? "Not a real transaction? Remove it" : "Don't import this one"}>Remove</button>
       </div>
       {c.fromPhoto ? <PhotoEdit c={c} editRow={editRow} /> : <div className="ap-imp-raw" title={c.desc}>{c.desc}</div>}
       {c.amountHint && <div className="ap-imp-check">{Math.abs(c.amountHint) === Math.abs(c.amount)
@@ -3523,6 +3541,32 @@ function Styles() {
   .ap-imp-photoedit input.missing{border-color:var(--clay);}
   .ap-imp-check{margin:6px 0 0 58px;font-size:12.5px;color:#6B4700;background:#FBF0D9;border-radius:7px;padding:6px 9px;}
   @media(max-width:600px){ .ap-imp-check{margin-left:0;} }
+
+  .ap-imp-remove{flex:none;font-family:'Archivo';font-weight:600;font-size:11.5px;color:var(--clay);background:none;border:1.5px solid var(--line);border-radius:7px;padding:3px 9px;cursor:pointer;margin-left:6px;}
+  .ap-imp-remove:hover{border-color:var(--clay);}
+  .ap-rowbtn.del .lbl{display:none;}
+  @media(max-width:600px){
+    /* Tracking as stacked cards on a phone, so Edit and Delete are always on screen */
+    .ap-txnscroll{max-height:none;overflow:visible;border:none;}
+    .ap-txntable thead{display:none;}
+    .ap-txntable,.ap-txntable tbody{display:block;}
+    .ap-txntable tr{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"cat cat amt" "note note note" "date bkt act";gap:4px 10px;
+      padding:10px 12px;border:1.5px solid var(--line);border-radius:11px;margin-bottom:8px;background:var(--paper2);align-items:center;}
+    .ap-txntable td{display:block;border:none;padding:0;min-width:0;}
+    .ap-txntable td:nth-child(1){grid-area:date;font-size:11.5px;}
+    .ap-txntable td:nth-child(2){display:none;}
+    .ap-txntable td:nth-child(3){grid-area:cat;}
+    .ap-txntable td:nth-child(4){grid-area:note;font-size:12.5px;overflow:hidden;}
+    .ap-txntable td:nth-child(5){grid-area:bkt;}
+    .ap-txntable td:nth-child(6){grid-area:amt;}
+    .ap-txntable td:nth-child(7){grid-area:act;}
+    .ap-txntable tr.editing{grid-template-columns:1fr;grid-template-areas:none;}
+    .ap-txntable tr.editing td{grid-area:auto !important;display:block !important;}
+    .ap-txntable td[colspan]{grid-column:1/-1;grid-area:auto;}
+    .ap-rowbtn.del .lbl{display:inline;}
+    .ap-rowbtn.del .x{display:none;}
+    .ap-rowbtn{padding:6px 11px;}
+  }
 
   /* statement import */
   .ap-iobtn.strong{background:var(--navy);color:var(--paper2);border-color:var(--navy);}
