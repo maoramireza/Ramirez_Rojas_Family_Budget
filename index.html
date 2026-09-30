@@ -1282,7 +1282,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-30 (traffic lights)";
+const APP_VERSION = "2026-09-30 (dots)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2129,60 +2129,66 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
   const everyday = envelopes.filter((e) => variableCats.has(e.c) && e.budget > 0);
   const evBudget = everyday.reduce((a, e) => a + e.budget, 0), evSpent = everyday.reduce((a, e) => a + e.spent, 0);
 
-  // ---- traffic lights: red = over (or spending with no budget), yellow = 85%+ used or running ahead of the calendar, green = fine
+  // ---- dots: red = over its budget, yellow = 85%+ used or running ahead of the calendar, green = fine,
+  //      gray = money spent in a category that has no budget this month (a planning gap, not overspending)
   const light = (e) => {
-    if (e.budget <= 0) return e.spent > 0 ? { s: "red", why: "no budget set" } : { s: "green" };
+    if (e.budget <= 0) return { s: e.spent > 0 ? "none" : "green" };
     if (Math.round(e.spent) > Math.round(e.budget)) return { s: "red" };
     const r = e.spent / e.budget;
-    if (r >= 0.85) return { s: "yellow", why: `${Math.round(r * 100)}% used` };
-    if (elapsed != null && variableCats.has(e.c) && r >= 0.25 && r > elapsed + 0.1) return { s: "yellow", why: `${Math.round(r * 100)}% used, ${Math.round(elapsed * 100)}% of the month gone` };
+    if (r >= 0.85) return { s: "yellow" };
+    if (elapsed != null && variableCats.has(e.c) && r >= 0.25 && r > elapsed + 0.1) return { s: "yellow", pace: true };
     return { s: "green" };
   };
-  const RANK = { red: 0, yellow: 1, green: 2 };
+  const RANK = { red: 0, yellow: 1, green: 2, none: 3 };
   const match = (c) => !q || c.toLowerCase().includes(q.toLowerCase());
   const kindC = (c) => state.categories.Expenses.includes(c) ? kindOf(state, c, dAuto) : "flex";
   const itemsOf = (c) => monthEntries.filter((x) => x.type === "Expenses" && x.category === c);
-  const everyRows = envelopes.filter((e) => kindC(e.c) === "flex").map((e) => ({ e, l: light(e) }))
-    .sort((a, b) => RANK[a.l.s] - RANK[b.l.s] || (b.e.spent / (b.e.budget || 1)) - (a.e.spent / (a.e.budget || 1)));
-  const counts = { red: 0, yellow: 0, green: 0 }; everyRows.forEach((r) => counts[r.l.s]++);
-  const attention = everyRows.filter((r) => r.l.s !== "green" && match(r.e.c));
-  const fine = everyRows.filter((r) => r.l.s === "green" && match(r.e.c));
-  const bills = envelopes.filter((e) => kindC(e.c) !== "flex");
+  const everyRows = envelopes.filter((e) => kindC(e.c) === "flex" || e.budget <= 0).map((e) => ({ e, l: light(e) }))
+    .sort((a, b) => RANK[a.l.s] - RANK[b.l.s] || (a.l.s === "none" ? b.e.spent - a.e.spent : (b.e.spent / (b.e.budget || 1)) - (a.e.spent / (a.e.budget || 1))));
+  const counts = { red: 0, yellow: 0, green: 0, none: 0 }; everyRows.forEach((r) => counts[r.l.s]++);
+  const pick = (s) => everyRows.filter((r) => r.l.s === s && match(r.e.c));
+  const attention = [...pick("red"), ...pick("yellow")], fine = pick("green"), nobudget = pick("none");
+  const noBudgetSpent = everyRows.filter((r) => r.l.s === "none").reduce((a, r) => a + r.e.spent, 0);
+  const bills = envelopes.filter((e) => kindC(e.c) !== "flex" && e.budget > 0);
   const billsShown = bills.filter((e) => match(e.c));
-  const withBudget = bills.filter((e) => e.budget > 0);
-  const paid = withBudget.filter((e) => e.spent >= e.budget * 0.95).length;
-  const billsDue = withBudget.reduce((a, e) => a + Math.max(0, e.budget - e.spent), 0);
-  const billsHigh = withBudget.filter((e) => Math.round(e.spent - e.budget) > Math.max(2, e.budget * 0.05)).length;
-  const evB = everyRows.reduce((a, r) => a + r.e.budget, 0), evS = everyRows.reduce((a, r) => a + r.e.spent, 0);
+  const paid = bills.filter((e) => e.spent >= e.budget * 0.95).length;
+  const billsDue = bills.reduce((a, e) => a + Math.max(0, e.budget - e.spent), 0);
+  const billsHigh = bills.filter((e) => Math.round(e.spent - e.budget) > Math.max(2, e.budget * 0.05)).length;
+  const planned = everyRows.filter((r) => r.l.s !== "none");
+  const evB = planned.reduce((a, r) => a + r.e.budget, 0), evS = planned.reduce((a, r) => a + Math.min(r.e.spent, r.e.budget), 0);
   const daysLeft = elapsed != null ? daysBetween(today, period.to) + 1 : null;
   const overall = remaining < 0 ? "red" : (usedPct >= 85 || counts.red > 0) ? "yellow" : "green";
   const savSpent = spentBy("Savings"), incSpent = spentBy("Income");
   const savDone = Object.values(savSpent).reduce((a, v) => a + v, 0), incDone = Object.values(incSpent).reduce((a, v) => a + v, 0);
-  const [openLine, setOpenLine] = useState({});
-  const toggleLine = (k) => setOpenLine((o) => ({ ...o, [k]: !o[k] }));
-  const [showFine, setShowFine] = useState(false);
+  const [open, setOpen] = useState({});
+  const tog = (k) => setOpen((o) => ({ ...o, [k]: !o[k] }));
   const [logOpen, setLogOpen] = useState(false);
-  const row = ({ e, l }) => <CatRow key={e.c} env={e} light={l} items={itemsOf(e.c)} defDate={period.defaultDate} addEntry={addEntry} onDelete={deleteEntry} />;
+  const dotRow = ({ e, l }) => <DotRow key={e.c} env={e} light={l} items={itemsOf(e.c)} defDate={period.defaultDate} addEntry={addEntry} onDelete={deleteEntry} />;
+  // A plain function, not a component, so rows inside keep their state (open, typing) when the page updates.
+  const group = ({ k, dot, label, value, rows, children }) => (
+    <>
+      <button className="ap-dgroup" onClick={() => tog(k)} aria-expanded={!!(open[k] || q)}>
+        <i className={"ap-dot " + dot} aria-hidden="true" /><span className="nm">{label}</span><span className="amt">{value}</span>
+        <span className="chev" aria-hidden="true">{open[k] || q ? "Hide" : "Show"}</span>
+      </button>
+      {(open[k] || q) && <div className="ap-dgrid">{rows.map(dotRow)}{children}</div>}
+    </>
+  );
+  const month = n === 1 ? MLABEL[+period.months[0].slice(5) - 1] : period.label;
 
   return (
     <>
       <section className={"ap-hero s-" + overall}>
-        <div className="ap-hero-top">
-          <div>
-            <div className="ap-hero-lbl">Left to spend{n === 1 ? ` in ${MLABEL[+period.months[0].slice(5) - 1]}` : ""}</div>
-            <div className="ap-hero-val">{remaining < 0 ? `${fmt(-remaining)} over` : fmt(remaining)}</div>
-          </div>
-          <div className="ap-hero-side">
-            <div>{fmt(spentTotal)} of {fmt(expBudget)}</div>
-            {daysLeft && evB - evS > 0 && <div>{daysLeft > 1 ? `Everyday: ${fmt((evB - evS) / daysLeft)}/day for ${daysLeft} days` : `Everyday: ${fmt(evB - evS)} left today`}</div>}
-          </div>
+        <div className="ap-hero-lbl">{remaining < 0 ? "Over budget" : "Left to spend"}{n === 1 ? ` in ${month}` : ""}</div>
+        <div className="ap-hero-row">
+          <div className="ap-hero-val">{fmt(Math.abs(remaining))}</div>
+          <div className="ap-hero-side">{fmt(spentTotal)} spent of {fmt(expBudget)}</div>
         </div>
         <div className="ap-track ap-paced"><div className="ap-fill" style={{ width: Math.min(usedPct, 100) + "%" }} />
-          {elapsed != null && <i className="ap-today" style={{ left: (elapsed * 100) + "%" }} title="Today" />}</div>
-        <div className="ap-lights" aria-label="Everyday categories">
-          {counts.red > 0 && <span className="ap-light red"><LightIcon s="red" /> {counts.red} over</span>}
-          {counts.yellow > 0 && <span className="ap-light yellow"><LightIcon s="yellow" /> {counts.yellow} close</span>}
-          <span className="ap-light green"><LightIcon s="green" /> {counts.green} on track</span>
+          {elapsed != null && <i className="ap-today" style={{ left: Math.min(99.5, elapsed * 100) + "%" }} title="Today" />}</div>
+        <div className="ap-hero-notes">
+          {noBudgetSpent > 0 && <div>{fmt(noBudgetSpent)} of it went to {counts.none} {counts.none === 1 ? "category" : "categories"} with no budget this month.</div>}
+          {daysLeft > 1 && evB - evS > 0 && <div>Everyday budgets have {fmt(evB - evS)} left, about {fmt((evB - evS) / daysLeft)} a day for {daysLeft} days.</div>}
         </div>
       </section>
       {(n > 1 || !isWholeMonths(period)) && (
@@ -2190,7 +2196,7 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
       )}
       {monthGaps.length > 0 && (
         <div className="ap-partialnote">
-          <b>{period.label} isn't complete yet.</b> Not imported: {monthGaps.slice(0, 3).map((g) => gapLabel(state, g)).join("; ")}{monthGaps.length > 3 ? `; and ${monthGaps.length - 3} more` : ""}. Income and spending from those dates aren't counted yet.
+          <b>{period.label} isn't complete yet.</b> Not imported: {monthGaps.slice(0, 3).map((g) => gapLabel(state, g)).join("; ")}{monthGaps.length > 3 ? `; and ${monthGaps.length - 3} more` : ""}.
         </div>
       )}
 
@@ -2202,49 +2208,34 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
         </div>
       </div>
 
-      <div className="ap-llist">
-        {attention.map(row)}
-        {(q || showFine) && fine.map(row)}
-        {!q && fine.length > 0 && (
-          <button className="ap-lmore" onClick={() => setShowFine(!showFine)} aria-expanded={showFine}>
-            <LightIcon s="green" /><span className="nm">{showFine ? "Hide the ones on track" : attention.length ? `${fine.length} more on track` : `All ${fine.length} on track`}</span><span className="amt">{showFine ? "Hide" : "Show"}</span>
-          </button>
-        )}
+      <div className="ap-dcard">
+        {attention.length > 0 && <div className="ap-dgrid">{attention.map(dotRow)}</div>}
+        {!q && attention.length === 0 && planned.length > 0 && <div className="ap-dall"><i className="ap-dot green" aria-hidden="true" />Every budgeted category is on track.</div>}
+        {fine.length > 0 && group({ k: "fine", dot: "green", label: "On track", value: `${fine.length}`, rows: fine })}
+        {nobudget.length > 0 && group({ k: "none", dot: "none", label: "Spent without a budget", value: `${nobudget.length} · ${fmt(nobudget.reduce((a, r) => a + r.e.spent, 0))}`, rows: nobudget,
+          children: goPlan && <div className="ap-dhint">Give them a budget in Planning, or move the transactions to a category you already budget.
+            <button className="ap-linkbtn" onClick={goPlan}>Open Planning</button></div> })}
+        {billsShown.length > 0 && group({ k: "bills", dot: billsHigh ? "red" : paid === bills.length ? "green" : "bill", label: "Bills",
+          value: `${paid} of ${bills.length} paid${billsDue > 0 ? ` · ${fmt(billsDue)} due` : ""}`,
+          rows: billsShown.map((e) => ({ e, l: { s: e.spent >= e.budget * 0.95 ? (Math.round(e.spent - e.budget) > Math.max(2, e.budget * 0.05) ? "red" : "green") : "bill", bill: true } })) })}
         {envelopes.length === 0 && <p className="ap-empty">No expense budget or spending for {period.label}. Set one in Planning.</p>}
-        {q && !attention.length && !fine.length && !billsShown.length && !unbudgeted.some(match) && <p className="ap-empty">No expense category matches "{q}".</p>}
+        {q && unbudgeted.some(match) && <div className="ap-dhint">No budget or spending this month: {unbudgeted.filter(match).join(" · ")}</div>}
+        {q && !attention.length && !fine.length && !nobudget.length && !billsShown.length && !unbudgeted.some(match) && <p className="ap-empty">No category matches "{q}".</p>}
       </div>
 
-      <div className="ap-llist ap-lines">
-        {bills.length > 0 && (!q || billsShown.length > 0) && <>
-          <button className="ap-line" onClick={() => toggleLine("bills")} aria-expanded={!!(openLine.bills || q)}>
-            <span className="nm">Bills<span className="sub">{paid} of {withBudget.length} paid{billsDue > 0 ? ` · ${fmt(billsDue)} still due` : ""}{billsHigh ? ` · ${billsHigh} higher than planned` : ""}</span></span>
-            <span className="chev" aria-hidden="true">{openLine.bills || q ? "▴" : "▾"}</span>
-          </button>
-          {(openLine.bills || q) && <div className="ap-billlist">{billsShown.map((e) => <Envelope key={e.c} env={e} compact items={itemsOf(e.c)} defDate={period.defaultDate} addEntry={addEntry} onDelete={deleteEntry} buckets={buckets} periodLabel={period.label} />)}</div>}
+      {!q && <div className="ap-dcard">
+        <button className="ap-dgroup" onClick={() => tog("sav")} aria-expanded={!!open.sav}>
+          <i className="ap-dot teal" aria-hidden="true" /><span className="nm">Savings</span><span className="amt">{fmt(savDone)} of {fmt(savBudget)}</span><span className="chev" aria-hidden="true">{open.sav ? "Hide" : "Show"}</span></button>
+        {open.sav && <MiniPanel title="" rows={state.categories.Savings} planAmt={(c) => planAmt("Savings", c)} spent={savSpent} accent="teal" verb="saved" />}
+        <button className="ap-dgroup" onClick={() => tog("inc")} aria-expanded={!!open.inc}>
+          <i className="ap-dot inc" aria-hidden="true" /><span className="nm">Income</span><span className="amt">{fmt(incDone)} of {fmt(incBudget)}</span><span className="chev" aria-hidden="true">{open.inc ? "Hide" : "Show"}</span></button>
+        {open.inc && <MiniPanel title="" rows={state.categories.Income} planAmt={(c) => planAmt("Income", c)} spent={incSpent} accent="emerald" verb="received" />}
+        {unbudgeted.length > 0 && <>
+          <button className="ap-dgroup" onClick={() => tog("idle")} aria-expanded={!!open.idle}>
+            <i className="ap-dot idle" aria-hidden="true" /><span className="nm">Not used this month</span><span className="amt">{unbudgeted.length}</span><span className="chev" aria-hidden="true">{open.idle ? "Hide" : "Show"}</span></button>
+          {open.idle && <div className="ap-dhint">{unbudgeted.join(" · ")}</div>}
         </>}
-        {!q && <>
-          <button className="ap-line" onClick={() => toggleLine("sav")} aria-expanded={!!openLine.sav}>
-            <span className="nm">Savings</span><span className="amt">{fmt(savDone)} of {fmt(savBudget)} saved</span><span className="chev" aria-hidden="true">{openLine.sav ? "▴" : "▾"}</span>
-          </button>
-          {openLine.sav && <MiniPanel title="" rows={state.categories.Savings} planAmt={(c) => planAmt("Savings", c)} spent={savSpent} accent="teal" verb="saved" />}
-          <button className="ap-line" onClick={() => toggleLine("inc")} aria-expanded={!!openLine.inc}>
-            <span className="nm">Income</span><span className="amt">{fmt(incDone)} of {fmt(incBudget)} received</span><span className="chev" aria-hidden="true">{openLine.inc ? "▴" : "▾"}</span>
-          </button>
-          {openLine.inc && <MiniPanel title="" rows={state.categories.Income} planAmt={(c) => planAmt("Income", c)} spent={incSpent} accent="emerald" verb="received" />}
-        </>}
-      </div>
-
-      {(() => { const list = unbudgeted.filter(match); return list.length > 0 && (
-        <div className="ap-unbud">
-          <button className="ap-imp-toggle" onClick={() => setShowUnbud(!showUnbud)} aria-expanded={showUnbud || !!q}>
-            <span>Not budgeted in {period.label} <span className="n">{list.length}</span></span><span className="chev">{showUnbud || q ? "Hide" : "Show"}</span>
-          </button>
-          {(showUnbud || q) && <div className="ap-unbud-body">
-            <p>No budget and no spending yet. Spending in them still counts.</p>
-            <div className="ap-unbud-chips">{list.map((c) => <span key={c}>{c}</span>)}</div>
-            {goPlan && <button className="ap-imp-secondary" onClick={goPlan}>Budget them in Planning</button>}
-          </div>}
-        </div>); })()}
+      </div>}
 
       {logOpen && (
         <Sheet title="Log a transaction" label="Log a transaction" onClose={() => setLogOpen(false)}>
@@ -2255,15 +2246,8 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
   );
 }
 
-function LightIcon({ s }) {
-  const p = s === "red" ? <><circle cx="8" cy="8" r="6.5" /><path d="M8 4.8v3.6M8 11.1v.1" /></>
-    : s === "yellow" ? <><path d="M8 2.2l6.2 11H1.8z" /><path d="M8 6.4v3M8 11.4v.1" /></>
-    : <><circle cx="8" cy="8" r="6.5" /><path d="M5.3 8.2l1.9 1.9 3.6-3.8" /></>;
-  return <svg className={"ap-licon " + s} viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{p}</svg>;
-}
-
-// One category in the traffic-light list. Tap it to see its transactions and log one.
-function CatRow({ env, light, items, defDate, addEntry, onDelete }) {
+// One category: a dot, the name and what's left. Tap it for the details, its transactions and a quick log.
+function DotRow({ env, light, items, defDate, addEntry, onDelete }) {
   const [open, setOpen] = useState(false);
   const [amt, setAmt] = useState("");
   const [note, setNote] = useState("");
@@ -2272,21 +2256,24 @@ function CatRow({ env, light, items, defDate, addEntry, onDelete }) {
     addEntry({ id: uid(), date: defDate, type: "Expenses", category: env.c, amount: a, note: note.trim() });
     setAmt(""); setNote("");
   };
-  const over = env.spent - env.budget;
-  const pct = env.budget > 0 ? Math.min(100, (env.spent / env.budget) * 100) : (env.spent > 0 ? 100 : 0);
-  const right = env.budget <= 0 ? `${fmt(env.spent)} spent` : Math.round(over) > 0 ? `${fmt(over)} over` : `${fmt(-over)} left`;
+  const diff = env.budget - env.spent, s = light.s;
+  const right = s === "none" ? fmt(env.spent)
+    : s === "bill" ? (env.spent > 0 ? `${fmt(env.spent)} of ${fmt(env.budget)}` : `${fmt(env.budget)} due`)
+    : Math.round(diff) < 0 ? `${fmt(-diff)} over` : light.bill && s === "green" ? "Paid" : `${fmt(diff)} left`;
+  const pct = env.budget > 0 ? Math.min(100, (env.spent / env.budget) * 100) : 100;
   return (
-    <div className={"ap-lrow s-" + light.s + (open ? " open" : "")}>
-      <button className="ap-lrow-main" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <LightIcon s={light.s} />
-        <span className="nm"><span className="t">{env.c}{items.length > 0 && <em className="ap-cnt">{items.length}</em>}</span>
-          {light.why && <span className="sub">{light.why}</span>}
-          <span className="ap-lbar"><i style={{ width: pct + "%" }} /></span></span>
+    <div className={"ap-drow s-" + s + (open ? " open" : "")}>
+      <button className="ap-drow-main" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <i className={"ap-dot " + s} aria-hidden="true" />
+        <span className="nm">{env.c}</span>
         <span className="amt">{right}</span>
       </button>
       {open && (
-        <div className="ap-lrow-more">
-          <div className="ap-imp-fine" style={{ margin: "0 0 8px" }}>{fmt2(env.spent)} spent of {fmt(env.budget)} budgeted</div>
+        <div className="ap-drow-more">
+          <div className="ap-drow-fact">
+            {env.budget > 0 ? <>{fmt2(env.spent)} of {fmt(env.budget)} · {Math.round(pct)}%{light.pace ? " · spending ahead of the calendar" : ""}</> : <>{fmt2(env.spent)} spent · no budget this month</>}
+          </div>
+          {env.budget > 0 && <div className="ap-lbar"><i style={{ width: pct + "%" }} /></div>}
           {env.note && <div className="ap-envnote">{env.note}</div>}
           <div className="ap-envform">
             <span className="cur">$</span>
@@ -2297,10 +2284,11 @@ function CatRow({ env, light, items, defDate, addEntry, onDelete }) {
           </div>
           {items.length > 0 && (
             <ul className="ap-env-items">
-              {items.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((x) => (
-                <li key={x.id}><span className="d">{niceDate(x.date).replace(/^\w+, /, "")}</span><span className="n">{x.note || x.name || "—"}</span>
+              {items.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 30).map((x) => (
+                <li key={x.id}><span className="d">{niceDate(x.date).replace(/^\w+, /, "")}</span><span className="n">{x.note || x.name || ""}</span>
                   <span className="a mono">{fmt2(x.amount)}</span><button className="x" onClick={() => onDelete(x.id)} title="Delete (you can Undo)" aria-label="Delete">×</button></li>
               ))}
+              {items.length > 30 && <li className="more">and {items.length - 30} more in Tracking</li>}
             </ul>
           )}
         </div>
@@ -4907,6 +4895,54 @@ function Styles() {
     .ap-lrow-more{padding-left:14px;}
     .ap-line .amt{white-space:normal;text-align:right;font-size:12px;}
   }
+
+  /* dashboard v2: dots */
+  .ap-hero-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:2px 0 10px;}
+  .ap-hero-notes{font-size:13px;color:var(--ink-soft);margin-top:9px;line-height:1.5;}
+  .ap-hero-notes:empty{display:none;}
+  .ap-dcard{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;}
+  .ap-dcard .ap-empty{padding:12px 14px;margin:0;}
+  .ap-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;background:var(--emerald);}
+  .ap-dot.red{background:var(--clay);}
+  .ap-dot.yellow{background:#D39A1E;}
+  .ap-dot.none{background:none;border:2px solid #9AA1AC;box-sizing:border-box;}
+  .ap-dot.bill{background:none;border:2px solid var(--navy);box-sizing:border-box;}
+  .ap-dot.teal{background:var(--teal);} .ap-dot.inc{background:var(--navy);}
+  .ap-dot.idle{background:var(--line);}
+  .ap-dgrid{display:grid;grid-template-columns:1fr;}
+  .ap-drow{border-bottom:1px solid var(--line);min-width:0;}
+  .ap-drow-main,.ap-dgroup{width:100%;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;background:none;border:none;cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);}
+  .ap-drow-main .nm{flex:1;min-width:0;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-drow-main .amt{font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-soft);}
+  .ap-drow.s-red .amt{color:var(--clay);font-weight:600;}
+  .ap-drow.s-yellow .amt{color:#8A5A00;font-weight:600;}
+  .ap-drow.s-none .amt,.ap-drow.s-none .nm{color:var(--ink-soft);}
+  .ap-drow.open{background:#fff;}
+  .ap-drow-more{padding:0 14px 12px 34px;}
+  .ap-drow-fact{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;}
+  .ap-drow-more .ap-lbar{margin:0 0 10px;height:4px;}
+  .ap-drow.s-yellow .ap-lbar i{background:#D39A1E;} .ap-drow.s-red .ap-lbar i{background:var(--clay);}
+  .ap-dgroup{border-bottom:1px solid var(--line);}
+  .ap-dcard>.ap-dgroup:last-child{border-bottom:none;}
+  .ap-dgroup .nm{flex:1;min-width:0;font-size:14.5px;font-weight:600;}
+  .ap-dgroup .amt{font-size:13.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .ap-dgroup .chev{font-size:12px;font-weight:600;color:var(--navy);width:34px;text-align:right;}
+  .ap-dgroup[aria-expanded="true"]{background:var(--paper);}
+  .ap-dgroup+.ap-dgrid{border-bottom:1px solid var(--line);}
+  .ap-dall{display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:14px;border-bottom:1px solid var(--line);}
+  .ap-dhint{grid-column:1/-1;font-size:12.5px;color:var(--ink-soft);padding:10px 14px;line-height:1.5;border-bottom:1px solid var(--line);}
+  .ap-dhint .ap-linkbtn{margin-left:6px;}
+  .ap-dcard .ap-mini{margin:0;border-bottom:1px solid var(--line);}
+  .ap-dcard .ap-mini-rows{border:none;border-radius:0;background:#fff;}
+  .ap-drow-more .ap-env-items .d{width:52px;white-space:nowrap;}
+  .ap-env-items li.more{color:var(--ink-soft);font-size:12px;justify-content:center;}
+  /* tablets and up: two columns so the eye doesn't travel across the whole screen */
+  @media(min-width:700px){
+    .ap-dgrid{grid-template-columns:1fr 1fr;}
+    .ap-dgrid .ap-drow:nth-child(odd){border-right:1px solid var(--line);}
+    .ap-drow.open{grid-column:1/-1;border-right:none !important;}
+  }
+  .ap-hero-val{font-size:34px;}
   `}</style>);
 }
 
