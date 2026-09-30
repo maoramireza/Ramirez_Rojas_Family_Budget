@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#EDEFF3" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Budget" />
 <title>Ramirez Rojas · Family Budget</title>
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
@@ -22,6 +27,255 @@ window.addEventListener("error", function(e){
       (e.message||e.error||"Unknown error")+'<br><br><span style="color:#5E6675;font-size:13px">If this mentions React, Babel, or Supabase, a library failed to load. Try a hard refresh. Otherwise screenshot this and send it over.</span></div>';
   }
 });
+</script>
+<script>
+/* ===== Budget sync: merge instead of overwrite (plain JS, tested separately) ===== */
+(function (root) {
+  "use strict";
+  // Stable JSON: the database stores objects with its own key order, so compare by content, not text.
+  function canon(v) {
+    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+    if (v && typeof v === "object") return "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  const same = (a, b) => canon(a) === canon(b);
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const hasIds = (arr) => Array.isArray(arr) && arr.length > 0 && arr.every((x) => isObj(x) && x.id != null);
+  const isScalars = (arr) => Array.isArray(arr) && arr.every((x) => x === null || typeof x !== "object");
+
+  // Three-way merge: base = what both sides last agreed on, ours = this device, theirs = what's saved now.
+  // Whatever only one side changed is kept; additions from both sides are kept; a deletion by either side is honored
+  // unless the other side edited that same thing. When both changed the same single value, this device's edit wins.
+  function merge3(base, ours, theirs) {
+    if (same(ours, theirs)) return ours;
+    if (same(base, ours)) return theirs;
+    if (same(base, theirs)) return ours;
+    if (ours === undefined) return theirs;            // we removed it, they changed it: keep their change
+    if (theirs === undefined) return ours;            // they removed it, we changed it: keep ours
+    const arrs = [base, ours, theirs].filter((x) => x !== undefined);
+    if (arrs.every(Array.isArray)) {
+      const b = Array.isArray(base) ? base : [];
+      if ([b, ours, theirs].every((a) => a.length === 0 || hasIds(a))) return mergeById(b, ours, theirs);
+      if ([b, ours, theirs].every(isScalars)) return mergeList(b, ours, theirs);
+      return ours;
+    }
+    if (isObj(ours) && isObj(theirs)) {
+      const b = isObj(base) ? base : {};
+      const out = {};
+      new Set([...Object.keys(b), ...Object.keys(ours), ...Object.keys(theirs)]).forEach((k) => {
+        const v = merge3(b[k], ours[k], theirs[k]);
+        if (v !== undefined) out[k] = v;
+      });
+      return out;
+    }
+    return ours;
+  }
+  function mergeById(base, ours, theirs) {
+    const map = (a) => new Map(a.map((x) => [String(x.id), x]));
+    const B = map(base), O = map(ours), T = map(theirs);
+    const out = [];
+    const seen = new Set();
+    theirs.forEach((x) => { const id = String(x.id); if (!O.has(id) && !B.has(id)) { out.push(x); seen.add(id); } });   // new from them
+    ours.forEach((x) => {
+      const id = String(x.id); if (seen.has(id)) return;
+      const v = merge3(B.get(id), x, T.get(id));
+      if (v !== undefined) out.push(v); seen.add(id);
+    });
+    theirs.forEach((x) => {                                          // theirs we never had but base did: we deleted it
+      const id = String(x.id); if (seen.has(id)) return;
+      const v = merge3(B.get(id), undefined, x);
+      if (v !== undefined) out.push(v);
+    });
+    return out;
+  }
+  function mergeList(base, ours, theirs) {
+    const inB = new Set(base.map(String)), inO = new Set(ours.map(String)), inT = new Set(theirs.map(String));
+    const keep = (x) => { const k = String(x); return !(inB.has(k) && (!inO.has(k) || !inT.has(k))); };  // removed by either side
+    const out = [];
+    const add = (x) => { if (!out.some((y) => String(y) === String(x)) && keep(x)) out.push(x); };
+    ours.forEach(add); theirs.forEach(add);
+    return out;
+  }
+
+  // Categories never vanish while they're in use: anything a transaction or budget refers to is listed,
+  // unless someone deliberately removed it (then it's recorded in hiddenCats).
+  function healCategories(s) {
+    if (!s || !s.categories) return s;
+    let changed = false;
+    const hidden = s.hiddenCats || {};
+    const want = { Income: new Set(), Expenses: new Set(), Savings: new Set() };
+    (s.entries || []).forEach((e) => { if (want[e.type] && e.category) want[e.type].add(e.category); });
+    Object.keys(want).forEach((t) => Object.entries((s.plan || {})[t] || {}).forEach(([c, months]) => { if (months && Object.values(months).some((v) => v)) want[t].add(c); }));
+    const next = { ...s.categories };
+    Object.keys(want).forEach((t) => {
+      const list = (next[t] || []).slice();
+      want[t].forEach((c) => { if (!list.includes(c) && !(hidden[t] || []).includes(c)) { list.push(c); changed = true; } });
+      next[t] = list;
+    });
+    return changed ? { ...s, categories: next } : s;
+  }
+
+  // A category only disappears when someone removed it on purpose (removing, renaming or resetting records it in
+  // hiddenCats). A copy that simply never had it, like an older version of the app or a phone that was out of date,
+  // can't make it vanish.
+  function keepCategories(merged, ours, theirs) {
+    if (!merged || !merged.categories) return merged;
+    const hidden = merged.hiddenCats || {};
+    const next = { ...merged.categories };
+    let changed = false;
+    [ours, theirs].forEach((src) => Object.entries((src && src.categories) || {}).forEach(([t, list]) => {
+      (list || []).forEach((c) => {
+        const cur = next[t] || [];
+        if (!cur.includes(c) && !(hidden[t] || []).includes(c)) { next[t] = [...cur, c]; changed = true; }
+      });
+    }));
+    return changed ? { ...merged, categories: next } : merged;
+  }
+  // Everything a save or an incoming change goes through.
+  function mergeStates(base, ours, theirs) {
+    if (!ours) return healCategories(theirs);
+    if (!theirs) return ours;
+    return healCategories(keepCategories(merge3(base || undefined, ours, theirs), ours, theirs));
+  }
+
+  // Undo/redo: revert (or re-apply) only what one step changed, keeping everything that happened since,
+  // including the other phone's edits.
+  const undoStep = (step, current) => healCategories(merge3(step.after, step.before, current));
+  const redoStep = (step, current) => healCategories(merge3(step.before, step.after, current));
+
+  // A short, plain description of what changed between two versions ("removed category Vacaciones").
+  function describe(a, b) {
+    if (!a || !b || same(a, b)) return null;
+    const money = (n) => "$" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    for (const t of ["Income", "Expenses", "Savings"]) {
+      const ca = (a.categories || {})[t] || [], cb = (b.categories || {})[t] || [];
+      const add = cb.filter((c) => !ca.includes(c)), rem = ca.filter((c) => !cb.includes(c));
+      if (add.length === 1 && rem.length === 1) return `renamed ${rem[0]} to ${add[0]}`;
+      if (rem.length) return rem.length === 1 ? `removed category ${rem[0]}` : `removed ${rem.length} categories`;
+      if (add.length) return add.length === 1 ? `added category ${add[0]}` : `added ${add.length} categories`;
+    }
+    const ea = new Map((a.entries || []).map((e) => [e.id, e])), eb = new Map((b.entries || []).map((e) => [e.id, e]));
+    const added = [...eb.values()].filter((e) => !ea.has(e.id)), gone = [...ea.values()].filter((e) => !eb.has(e.id));
+    const edited = [...eb.values()].filter((e) => ea.has(e.id) && !same(ea.get(e.id), e));
+    const one = (e) => `${e.category || "uncategorized"} ${money(e.amount)}`;
+    if (added.length && gone.length) return `added ${added.length} and removed ${gone.length} transactions`;
+    if (added.length) return added.length === 1 ? `added ${one(added[0])}` : `added ${added.length} transactions`;
+    if (gone.length) return gone.length === 1 ? `deleted ${one(gone[0])}` : `deleted ${gone.length} transactions`;
+    if (edited.length) return edited.length === 1 ? `edited ${one(edited[0])}` : `edited ${edited.length} transactions`;
+    const changedCats = (key) => {
+      const out = new Set();
+      ["Income", "Expenses", "Savings"].forEach((t) => {
+        const pa = ((a[key] || {})[t]) || {}, pb = ((b[key] || {})[t]) || {};
+        new Set([...Object.keys(pa), ...Object.keys(pb)]).forEach((c) => { if (!same(pa[c], pb[c])) out.add(c); });
+      });
+      return [...out];
+    };
+    const meta = changedCats("catMeta");
+    if (meta.length) return meta.length === 1 ? `changed how ${meta[0]} is planned` : `changed how ${meta.length} categories are planned`;
+    const plan = [...new Set([...changedCats("plan"), ...changedCats("planOverride")])];
+    if (plan.length) return plan.length === 1 ? `budget for ${plan[0]}` : `budgets for ${plan.length} categories`;
+    if (!same(a.planMonths, b.planMonths)) return "budget months";
+    if (!same(a.buckets, b.buckets)) return "buckets";
+    if (!same(a.split, b.split)) return "split";
+    if (!same(a.settings, b.settings)) return "a setting";
+    if (!same(a.importer, b.importer)) return "import settings";
+    return "last change";
+  }
+
+  const api = { canon, same, merge3, healCategories, keepCategories, mergeStates, undoStep, redoStep, describe };
+  root.BudgetSync = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<script>
+/* ===== Planning helpers: paydays, non-monthly costs, bill detection (plain JS, tested separately) ===== */
+(function (root) {
+  "use strict";
+  const pad = (n) => String(n).padStart(2, "0");
+  const lastDay = (key) => { const [y, m] = key.split("-").map(Number); return new Date(y, m, 0).getDate(); };
+  const addMonths = (key, n) => { const [y, m] = key.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const toDate = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d, 12); };
+  const toISO = (t) => `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+  const addDays = (iso, n) => { const t = toDate(iso); t.setDate(t.getDate() + n); return toISO(t); };
+  const daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+  const round2 = (v) => Math.round(v * 100) / 100;
+  // Saturday or Sunday paydays are paid the Friday before.
+  const beforeWeekend = (iso) => { const wd = toDate(iso).getDay(); return wd === 6 ? addDays(iso, -1) : wd === 0 ? addDays(iso, -2) : iso; };
+  const dayIn = (key, d) => `${key}-${pad(Math.min(d, lastDay(key)))}`;
+
+  // The dates that count toward month `key`: paychecks in the last `shift` days of a month count toward the next one.
+  function payWindow(key, shift) {
+    const n = shift || 0;
+    const prev = addMonths(key, -1);
+    return { from: n ? `${prev}-${pad(lastDay(prev) - n + 1)}` : `${key}-01`, to: `${key}-${pad(lastDay(key) - n)}` };
+  }
+  // pay = { freq: "biweekly" | "semimonthly" | "monthly", anchor: "YYYY-MM-DD" (biweekly), day: 1-31 (monthly), amount }
+  function paydays(pay, key, shift) {
+    if (!pay || !pay.freq) return [];
+    const { from, to } = payWindow(key, shift);
+    const out = [];
+    if (pay.freq === "biweekly") {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(pay.anchor || "")) return [];
+      let d = addDays(pay.anchor, Math.ceil(daysBetween(pay.anchor, from) / 14) * 14);
+      for (; d <= to; d = addDays(d, 14)) if (d >= from) out.push(d);
+      return out;
+    }
+    const cands = [];
+    [addMonths(key, -1), key].forEach((k) => {
+      if (pay.freq === "semimonthly") cands.push(beforeWeekend(dayIn(k, 15)), beforeWeekend(dayIn(k, 31)));
+      if (pay.freq === "monthly") cands.push(beforeWeekend(dayIn(k, +pay.day || 1)));
+    });
+    return [...new Set(cands)].filter((d) => d >= from && d <= to).sort();
+  }
+  const payAmount = (pay, key, shift) => round2(paydays(pay, key, shift).length * (+pay.amount || 0));
+
+  // Non-monthly: sched = { months: [1..12], amount, mode: "due" (budget it in the months it's due) | "spread" (set aside monthly) }
+  function schedAmount(sched, key) {
+    if (!sched || !(sched.months || []).length || !(+sched.amount > 0)) return 0;
+    if (sched.mode === "spread") return round2((+sched.amount * sched.months.length) / 12);
+    return sched.months.includes(+key.slice(5)) ? round2(+sched.amount) : 0;
+  }
+  // The most recent due month before `key` (so the set-aside fund restarts after each payment).
+  function lastDueBefore(sched, key) {
+    for (let i = 1; i <= 12; i++) { const k = addMonths(key, -i); if ((sched.months || []).includes(+k.slice(5))) return k; }
+    return null;
+  }
+
+  // Guess a pay schedule from past deposits: [{date, amount}] (any order).
+  function detectPay(rows, today) {
+    const since = addDays(today, -200);
+    const list = rows.filter((r) => r.date && r.date >= since && r.date <= today && r.amount > 0).sort((a, b) => a.date.localeCompare(b.date));
+    // Same-day deposits (split paychecks) count as one payday.
+    const days = [];
+    list.forEach((r) => { const last = days[days.length - 1]; if (last && last.date === r.date) last.amount += r.amount; else days.push({ date: r.date, amount: r.amount }); });
+    if (days.length < 3) return null;
+    const gaps = days.slice(1).map((r, i) => daysBetween(days[i].date, r.date));
+    const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+    const g = med(gaps);
+    const amount = round2(med(days.slice(-4).map((r) => r.amount)));
+    const latest = days[days.length - 1].date;
+    const recent = gaps.slice(-4);
+    if (g >= 13 && g <= 15 && recent.every((x) => x >= 12 && x <= 16)) return { freq: "biweekly", anchor: latest, amount, count: days.length };
+    if (g >= 12 && g <= 18 && recent.every((x) => x >= 10 && x <= 20)) return { freq: "semimonthly", amount, count: days.length, latest };
+    if (g >= 26 && g <= 33 && recent.every((x) => x >= 25 && x <= 35)) return { freq: "monthly", day: med(days.slice(-4).map((r) => +r.date.slice(8))), amount, count: days.length, latest };
+    return null;
+  }
+
+  // Bills come once or twice a month, in most recent months, with a steady total (utilities can move up to 25%).
+  // months = [{ count, sum }] for the last few months that have any data (months with nothing for this category are {0,0}).
+  function looksFixed(months) {
+    const hit = months.filter((m) => m.count > 0);
+    if (hit.length < 2 || hit.length < months.length - 1) return false;
+    if (hit.some((m) => m.count > 2)) return false;
+    const sums = hit.map((m) => m.sum).sort((a, b) => a - b);
+    const mid = sums[Math.floor(sums.length / 2)];
+    return mid > 0 && sums.every((s) => Math.abs(s - mid) <= Math.max(2, mid * 0.25));
+  }
+
+  const api = { payWindow, paydays, payAmount, schedAmount, lastDueBefore, detectPay, looksFixed, beforeWeekend };
+  root.PlanKit = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof window !== "undefined" ? window : globalThis);
 </script>
 <script>
 /* ===== Statement importer core (plain JS, tested separately) ===== */
@@ -1028,12 +1282,39 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-29 (photos v7, remove)";
+const APP_VERSION = "2026-09-30 (touch pass)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
 const fmt = (n) => { const r = Math.round(n); return (r<0?"-":"") + "$" + Math.abs(r).toLocaleString("en-US"); };
 const fmt2 = (n) => (n<0?"-":"") + "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+/* Money boxes: while you type, the box shows exactly what you typed (so "0.", "12.5" or an empty box all work),
+   tapping a box selects its number so typing replaces it, and the phone shows the number keypad. */
+const selectAll = (e) => {
+  const el = e.target; let typed = false; const mark = () => { typed = true; };
+  el.addEventListener("input", mark, { once: true });
+  try { el.select(); } catch (_) {}
+  // Safari needs a second go after the tap finishes; skip it if typing already started.
+  setTimeout(() => { el.removeEventListener("input", mark); if (!typed && document.activeElement === el) { try { el.setSelectionRange(0, el.value.length); } catch (_) {} } }, 0);
+};
+const parseMoney = (t) => { const n = parseFloat(String(t == null ? "" : t).replace(/[^0-9.]/g, "")); return isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+function MoneyInput({ value, onValue, commit = "change", placeholder, ariaLabel, className, max, keepIfEmpty, autoFocus, onEnter }) {
+  const [draft, setDraft] = useState(null);
+  const shown = draft != null ? draft : (value == null || value === 0 || value === "" ? "" : Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+  const clamp = (v) => (max != null ? Math.min(max, v) : v);
+  const finish = () => {
+    if (draft == null) return;
+    const empty = draft.trim() === "";
+    if (commit === "blur" && !(empty && keepIfEmpty)) onValue(clamp(parseMoney(draft)));
+    setDraft(null);
+  };
+  return <input type="text" inputMode="decimal" enterKeyHint="done" autoComplete="off" className={className} value={shown}
+    placeholder={placeholder} aria-label={ariaLabel} autoFocus={autoFocus}
+    onFocus={(e) => { setDraft(value ? String(value) : ""); selectAll(e); }}
+    onChange={(e) => { const t = e.target.value.replace(/[^0-9.,]/g, ""); setDraft(t); if (commit === "change") onValue(clamp(parseMoney(t))); }}
+    onBlur={finish}
+    onKeyDown={(e) => { if (e.key === "Enter") { e.currentTarget.blur(); if (onEnter) onEnter(); } }} />;
+}
 const uid = () => (window.crypto?.randomUUID?.() || String(Date.now()+Math.random()));
 
 function App({ session, onSignOut }) {
@@ -1052,75 +1333,132 @@ function App({ session, onSignOut }) {
   const [backupsOpen, setBackupsOpen] = useState(false);
   const [showLogoutWarning, setShowLogoutWarning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const firstSave = useRef(true);
-  const lastSavedRef = useRef(null);
+  const [loadError, setLoadError] = useState(false);
   const stateRef = useRef(null);
+  // base = the copy this device and the server last agreed on; rev = its revision number on the server.
+  const syncRef = useRef({ base: null, baseKey: "", rev: null, queue: Promise.resolve() });
   const lastActivityRef = useRef(Date.now());
   const warningShownRef = useRef(false);
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
   const WARNING_TIME = 2 * 60 * 1000;
 
-  /* ---- load from Supabase ---- */
-  useEffect(() => {
-    (async () => {
-      let init = null;
-      try {
-        const { data, error } = await sb.from("budgets").select("state").eq("id", "family").maybeSingle();
-        if (!error && data && data.state) init = data.state;
-      } catch (e) {}
-      const initial = init || { ...structuredClone(BASELINE), entries: [] };
-      lastSavedRef.current = JSON.stringify(initial);
-      setState(initial);
-      setLoaded(true);
-      try { const a = await window.loadArchives(); setArchives(a || []); } catch (e) {}
-    })();
-  }, []);
-
-  /* ---- save (robust, with visible status + flush on hide) ---- */
-  useEffect(() => { stateRef.current = state; }, [state]);
-
-  const doSave = async (st) => {
-    if (!st) return;
-    const json = JSON.stringify(st);
-    if (json === lastSavedRef.current) return;
-    setSaveStatus("saving");
-    try {
-      const { error } = await sb.from("budgets").upsert(
-        { id: "family", state: st, updated_at: new Date().toISOString(), updated_by: session?.user?.id },
-        { onConflict: "id" }
-      );
-      if (error) throw error;
-      lastSavedRef.current = json;
-      setSaveStatus("saved");
-      setTimeout(() => setSaveStatus((s) => s === "saved" ? "idle" : s), 1600);
-    } catch (e) {
-      setSaveStatus("error");
-    }
+  /* ---- sync: every save merges with what's on the server, so one phone can never erase the other's changes ---- */
+  const BS = window.BudgetSync;
+  const unwrap = (st) => { if (!st || typeof st !== "object") return null; const { _rev, __backup, ...rest } = st; return rest; };
+  const revOf = (st) => (st && typeof st._rev === "number" ? st._rev : null);
+  const put = (next) => { stateRef.current = next; setState(next); };
+  const setBase = (st, rev) => { const sr = syncRef.current; sr.base = st; sr.baseKey = st ? BS.canon(st) : ""; sr.rev = rev; };
+  const isDirty = () => !!stateRef.current && BS.canon(stateRef.current) !== syncRef.current.baseKey;
+  // Saves and incoming changes run one at a time, in order.
+  const serial = (task) => { const sr = syncRef.current; const p = sr.queue.then(task, task); sr.queue = p.catch(() => {}); return p; };
+  const fetchLive = async () => {
+    const { data, error } = await sb.from("budgets").select("state").eq("id", "family").maybeSingle();
+    if (error) throw error;
+    return data && data.state ? data.state : null;
   };
+  // Fold a copy saved on the other phone into this one. `live` = read straight from the server (always current);
+  // otherwise it came from the live feed, which can arrive late, so an older revision is ignored.
+  const absorb = (raw, live) => {
+    const sr = syncRef.current;
+    const theirs = unwrap(raw); if (!theirs || !theirs.categories) return;
+    const rev = revOf(raw);
+    if (!live && rev != null && sr.rev != null && rev < sr.rev) return;
+    if (BS.canon(theirs) === sr.baseKey) { sr.rev = rev; return; }
+    const local = stateRef.current;
+    const merged = BS.mergeStates(sr.base, local, theirs);
+    setBase(theirs, rev);
+    if (!local || !BS.same(merged, local)) put(merged);
+  };
+  const pull = () => serial(async () => { try { const raw = await fetchLive(); if (raw) absorb(raw, true); } catch (e) {} });
+
+  /* ---- load ---- */
+  const load = async () => {
+    setLoadError(false);
+    let raw = null;
+    for (let attempt = 0; ; attempt++) {
+      try { raw = await fetchLive(); break; }
+      catch (e) { if (attempt >= 2) { setLoadError(true); return; } await new Promise((r) => setTimeout(r, 1500)); }
+    }
+    const server = unwrap(raw);
+    setBase(server, revOf(raw));
+    // Categories used by transactions or budgets are always listed (brings back any that went missing).
+    put(BS.healCategories(server || { ...structuredClone(BASELINE), entries: [] }));
+    setLoaded(true);
+    try { const a = await window.loadArchives(); setArchives(a || []); } catch (e) {}
+  };
+  useEffect(() => { load(); }, []);
+
+  /* ---- save: a conditional write that only lands if nobody else saved since; otherwise merge and try again ---- */
+  const saveLoop = async () => {
+    const sr = syncRef.current;
+    let wrote = false;
+    for (let round = 0; round < 6; round++) {
+      const local = stateRef.current;
+      if (!local) return false;
+      if (BS.canon(local) === sr.baseKey) return wrote ? "saved" : "clean";
+      setSaveStatus("saving");
+      const rev = sr.rev;
+      const nextRev = Math.max(Date.now(), (rev || 0) + 1);
+      const row = { state: { ...local, _rev: nextRev }, updated_at: new Date().toISOString(), updated_by: session?.user?.id };
+      if (sr.base == null) {                       // first ever save: no row yet
+        const live = await fetchLive();
+        if (live) { absorb(live, true); continue; }
+        const { error } = await sb.from("budgets").insert({ id: "family", ...row });
+        if (error) throw error;
+        setBase(local, nextRev); wrote = true; continue;
+      }
+      let q = sb.from("budgets").update(row).eq("id", "family");
+      q = rev == null ? q.is("state->_rev", null) : q.eq("state->>_rev", String(rev));
+      const { data, error } = await q.select("id");
+      if (error) throw error;
+      if (data && data.length) { setBase(local, nextRev); wrote = true; continue; }
+      // The other phone saved first: take its copy, merge ours into it, and write again.
+      const live = await fetchLive();
+      if (live) absorb(live, true);
+    }
+    return BS.canon(stateRef.current) === sr.baseKey ? "saved" : "busy";
+  };
+  const doSave = () => serial(async () => {
+    try {
+      const r = await saveLoop();
+      if (r === "saved") { setSaveStatus("saved"); setTimeout(() => setSaveStatus((s) => s === "saved" ? "idle" : s), 1600); }
+      else if (r === "busy") setSaveStatus("error");
+      else setSaveStatus((s) => s === "saving" ? "idle" : s);
+      return r === "saved" || r === "clean";
+    } catch (e) {
+      console.warn("Save failed", e);
+      setSaveStatus("error");
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (!loaded || !state) return;
-    if (firstSave.current) { firstSave.current = false; return; }
-    if (JSON.stringify(state) === lastSavedRef.current) return;
-    const t = setTimeout(() => doSave(state), 600);
+    if (BS.canon(state) === syncRef.current.baseKey) return;
+    const t = setTimeout(() => doSave(), 600);
     return () => clearTimeout(t);
   }, [state, loaded]);
 
+  // Leaving the page saves now; coming back (or reconnecting) picks up anything the other phone saved meanwhile.
   useEffect(() => {
-    const flush = () => { const st = stateRef.current; if (st && JSON.stringify(st) !== lastSavedRef.current) doSave(st); };
-    const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    if (!loaded) return;
+    const flush = () => { if (isDirty()) doSave(); };
+    const onVis = () => { if (document.visibilityState === "hidden") flush(); else pull(); };
+    const onOnline = () => pull();
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pagehide", flush);
-    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", flush); };
-  }, []);
+    window.addEventListener("online", onOnline);
+    const every = setInterval(() => { if (document.visibilityState === "visible") pull(); }, 2 * 60 * 1000);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", flush); window.removeEventListener("online", onOnline); clearInterval(every); };
+  }, [loaded]);
 
-  /* ---- realtime ---- */
+  /* ---- realtime: merge what the other phone saved (never replace this phone's unsaved edits) ---- */
   useEffect(() => {
     if (!loaded) return;
     const ch = sb.channel("budgets-changes")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budgets", filter: "id=eq.family" },
-        (payload) => { if (payload.new?.state) { lastSavedRef.current = JSON.stringify(payload.new.state); setState(payload.new.state); } })
-      .subscribe();
+        (payload) => { const st = payload.new && payload.new.state; if (st && st.categories) serial(async () => absorb(st, false)); else pull(); })
+      .subscribe((status) => { if (status === "SUBSCRIBED") pull(); });
     return () => { sb.removeChannel(ch); };
   }, [loaded]);
 
@@ -1151,55 +1489,91 @@ function App({ session, onSignOut }) {
     return () => { clearInterval(interval); events.forEach((e)=>document.removeEventListener(e, handleActivity)); };
   }, [loaded]);
 
-  const update = (fn) => setState((prev) => { const next = structuredClone(prev); fn(next); return next; });
+  /* ---- undo / redo: this device's own changes, most recent first. Undoing reverts only what that step changed,
+     so anything saved since (including the other phone's edits) stays. Kept until the page is reloaded; Backups go further back. ---- */
+  const histRef = useRef({ undo: [], redo: [] });
+  const [hist, setHist] = useState({ undo: null, redo: null, n: 0 });
+  const [undoMsg, setUndoMsg] = useState("");
+  const showHist = () => { const h = histRef.current; setHist({ undo: h.undo.length ? h.undo[h.undo.length - 1].label : null, redo: h.redo.length ? h.redo[h.redo.length - 1].label : null, n: h.undo.length }); };
+  const record = (before, after, label) => {
+    const what = label || BS.describe(before, after); if (!what) return;
+    const h = histRef.current, last = h.undo[h.undo.length - 1], now = Date.now();
+    // Typing "450" is one change, not three: edits to the same thing within a couple of seconds are one step.
+    if (!label && last && !last.fixed && last.label === what && now - last.at < 2500) { last.after = after; last.at = now; }
+    else { h.undo.push({ before, after, label: what, at: now, fixed: !!label }); if (h.undo.length > 50) h.undo.shift(); }
+    h.redo = []; setUndoMsg(""); showHist();
+  };
+  const clearHistory = () => { histRef.current = { undo: [], redo: [] }; setUndoMsg(""); showHist(); };
+  const undo = () => {
+    const h = histRef.current, step = h.undo.pop(); if (!step || !stateRef.current) return;
+    put(BS.undoStep(step, stateRef.current)); h.redo.push({ ...step, at: 0 });
+    setUndoMsg(`Undid: ${step.label}`); showHist();
+  };
+  const redo = () => {
+    const h = histRef.current, step = h.redo.pop(); if (!step || !stateRef.current) return;
+    put(BS.redoStep(step, stateRef.current)); h.undo.push({ ...step, at: 0, fixed: true });
+    setUndoMsg(`Redid: ${step.label}`); showHist();
+  };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase(); if (k !== "z" && k !== "y") return;
+      const t = e.target, tag = t && t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;   // let the text box undo its own typing
+      if (document.querySelector(".ap-imp-overlay")) return;                                                   // not while a window is open
+      e.preventDefault();
+      if (k === "y" || e.shiftKey) redo(); else undo();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const update = (fn, label) => { const prev = stateRef.current; if (!prev) return; const next = structuredClone(prev); fn(next); put(next); record(prev, next, label); };
+  const hide = (s, type, cat) => { s.hiddenCats = { ...(s.hiddenCats || {}) }; s.hiddenCats[type] = [...new Set([...(s.hiddenCats[type] || []), cat])]; };
+  const unhide = (s, type, cat) => { if (s.hiddenCats && s.hiddenCats[type]) s.hiddenCats = { ...s.hiddenCats, [type]: s.hiddenCats[type].filter((c) => c !== cat) }; };
 
   // One month: the change repeats into later months. Several months: only those months change.
-  const setPlanAmt = (type, cat, months, amt) => update((s) => {
-    const v = amt && amt > 0 ? Math.round(amt*100)/100 : 0;
-    if (months.length > 1) ownMonth(s, addMonths(months[months.length-1], 1));
-    months.forEach((k) => {
-      ownMonth(s, k);
-      s.plan[type] = s.plan[type] || {}; s.plan[type][cat] = s.plan[type][cat] || {};
-      if (v) s.plan[type][cat][k] = v; else delete s.plan[type][cat][k];
-    });
+  const setPlanAmt = (type, cat, months, amt) => update((s) => writePlan(s, type, cat, months, amt));
+  const applyPlan = async (months, rows, label) => { await backupBefore(label); update((s) => rows.forEach((r) => writePlan(s, r.type, r.cat, months, r.amount)), `planned ${months.length === 1 ? monthLabel(months[0]) : months.length + " months"} (${rows.length} ${rows.length === 1 ? "category" : "categories"})`); };
+  const setCatMeta = (type, cat, meta) => update((s) => {
+    s.catMeta = { ...(s.catMeta || {}) }; s.catMeta[type] = { ...(s.catMeta[type] || {}) };
+    if (meta) s.catMeta[type][cat] = meta; else delete s.catMeta[type][cat];
   });
+  const clearOverride = (type, cat, months) => update((s) => {
+    const o = s.planOverride && s.planOverride[type] && s.planOverride[type][cat]; if (!o) return;
+    const n = { ...o }; months.forEach((k) => delete n[k]);
+    s.planOverride = { ...s.planOverride, [type]: { ...s.planOverride[type], [cat]: n } };
+  });
+  const moveKey = (obj, type, from, to) => { if (!obj || !obj[type] || !(from in obj[type])) return; const t = { ...obj[type] }; if (to) t[to] = t[from]; delete t[from]; obj[type] = t; };
   const addCat = (type, name) => update((s) => {
-    name = (name||"").trim(); if (!name || s.categories[type].includes(name)) return;
-    s.categories[type].push(name); s.plan[type] = s.plan[type]||{}; s.plan[type][name] = {};
+    name = (name||"").trim(); if (!name) return;
+    unhide(s, type, name);
+    if (s.categories[type].includes(name)) return;
+    s.categories[type].push(name); s.plan[type] = s.plan[type]||{}; s.plan[type][name] = s.plan[type][name] || {};
   });
   const removeCat = (type, cat) => update((s) => {
     s.categories[type] = s.categories[type].filter((c)=>c!==cat);
     if (s.plan[type]) delete s.plan[type][cat];
+    moveKey(s.catMeta, type, cat, null); moveKey(s.planOverride, type, cat, null);
+    hide(s, type, cat);
   });
   const renameCat = (type, oldN, newN) => update((s) => {
     newN = (newN||"").trim(); if (!newN || oldN===newN || s.categories[type].includes(newN)) return;
     s.categories[type] = s.categories[type].map((c)=>c===oldN?newN:c);
+    hide(s, type, oldN); unhide(s, type, newN);
     if (s.plan[type]?.[oldN]) { s.plan[type][newN] = {...s.plan[type][oldN]}; delete s.plan[type][oldN]; }
+    moveKey(s.catMeta, type, oldN, newN); moveKey(s.planOverride, type, oldN, newN);
     s.entries = s.entries.map((e)=> e.type===type&&e.category===oldN ? {...e, category:newN} : e);
   });
-  const copyBudget = (srcKey, targets) => {
-    const base = stateRef.current || state;
-    if (!srcKey) return { ok: false, text: "Pick a month to copy from." };
-    const values = [];
-    TYPES.forEach((t) => base.categories[t].forEach((c) => { const v = planFor(base, t, c, srcKey); if (v) values.push([t, c, v]); }));
-    if (!values.length) return { ok: false, text: `${monthLabel(srcKey)} has no budget amounts to copy. Pick another month.` };
-    const own = budgetedMonths(base);
-    const filled = targets.filter((k) => own.includes(k) && TYPES.some((t) => base.categories[t].some((c) => base.plan[t]?.[c]?.[k])));
-    if (filled.length && !confirm(`${filled.map(monthLabel).join(", ")} already ${filled.length > 1 ? "have budgets" : "has a budget"}. Replace with ${monthLabel(srcKey)}'s amounts?`))
-      return { ok: false, text: "Nothing was copied." };
-    backupBefore(`Before copying ${monthLabel(srcKey)}`);
-    update((s) => {
-      if (targets.length > 1) ownMonth(s, addMonths(targets[targets.length - 1], 1));
-      targets.forEach((k) => {
-        ownMonth(s, k);
-        TYPES.forEach((t) => (s.categories[t] || []).forEach((c) => { if (s.plan[t]?.[c]) delete s.plan[t][c][k]; }));
-        values.forEach(([t, c, v]) => { s.plan[t] = s.plan[t] || {}; s.plan[t][c] = s.plan[t][c] || {}; s.plan[t][c][k] = v; });
-      });
-    });
-    return { ok: true, text: `Copied ${values.length} amounts from ${monthLabel(srcKey)} into ${targets.length > 1 ? targets.length + " months" : monthLabel(targets[0])}.` };
-  };
-  const resetPlan = () => { if (!confirm("Reset all categories and budget amounts to the original plan? Your logged transactions are kept.")) return; backupBefore("Before resetting the plan");
-    update((s)=>{ s.categories = structuredClone(BASELINE.categories); s.plan = structuredClone(BASELINE.plan); s.planMonths = []; }); };
+  const resetPlan = () => { if (!confirm("Reset categories and budget amounts to the original plan?\n\nYour transactions are kept, and so is every category that has transactions.")) return; backupBefore("Before resetting the plan");
+    update((s)=>{
+      const before = structuredClone(s.categories);
+      s.categories = structuredClone(BASELINE.categories);
+      (s.entries || []).forEach((e) => { const l = s.categories[e.type]; if (l && e.category && !l.includes(e.category)) l.push(e.category); });
+      s.hiddenCats = {};
+      TYPES.forEach((t) => (before[t] || []).forEach((c) => { if (!s.categories[t].includes(c)) hide(s, t, c); }));
+      s.plan = structuredClone(BASELINE.plan); s.planMonths = []; s.catMeta = {}; s.planOverride = {};
+    }, "reset to original"); };
   const addEntry = (e) => update((s)=> s.entries.unshift(e));
   const editEntry = (id, patch) => update((s)=> { s.entries = s.entries.map((x)=>x.id===id?{...x,...patch}:x); });
   const deleteEntry = (id) => update((s)=> { s.entries = s.entries.filter((x)=>x.id!==id); });
@@ -1208,13 +1582,12 @@ function App({ session, onSignOut }) {
   });
 
   /* ---- statement import: applied to the latest state and saved immediately, not on the debounce ---- */
-  const commit = async (fn) => {
+  const commit = async (fn, label) => {
     const base = stateRef.current; if (!base) return { ok: false };
     const next = structuredClone(base);
     if (fn(next) === false) return { ok: false, aborted: true };
-    stateRef.current = next; setState(next);
-    await doSave(next);
-    return { ok: JSON.stringify(next) === lastSavedRef.current };
+    put(next); record(base, next, label);
+    return { ok: await doSave() };
   };
   const commitImport = async (args) => { await backupBefore(args.stmt.photo ? "Before importing photos" : `Before importing ${args.stmt.label} ····${args.stmt.last4}`); return commitImportNow(args); };
   const commitImportNow = ({ stmt, importId, built, answers, extraCats, by }) => commit((s) => {
@@ -1234,7 +1607,7 @@ function App({ session, onSignOut }) {
     imp.imports = [{ id: importId, fp: stmt.fingerprint, acct: stmt.last4, kind: stmt.kind, label: stmt.label, start: stmt.start, end: stmt.end,
       at: new Date().toISOString(), by, count: built.entries.length, removed }, ...imp.imports];
     s.importer = imp;
-  });
+  }, stmt.photo ? "imported photos" : `imported ${stmt.label} ····${stmt.last4}`);
   const undoImport = async (id) => { await backupBefore("Before undoing an import"); return undoImportNow(id); };
   const undoImportNow = (id) => commit((s) => {
     const imp = { ...EMPTY_IMPORTER, ...(s.importer || {}) };
@@ -1243,7 +1616,7 @@ function App({ session, onSignOut }) {
     s.entries = [...s.entries.filter((e) => e.importId !== id), ...(rec.removed || []).filter((e) => !have.has(e.id))];
     imp.imports = imp.imports.filter((i) => i.id !== id);
     s.importer = imp;
-  });
+  }, "undid an import");
   const setSetting = (k, v) => update((s) => { s.settings = { ...(s.settings || {}), [k]: v }; });
   /* ---- backups: full copies stored as extra rows beside the live budget; live sync only watches id "family" ---- */
   const myName = NAMES[(session?.user?.email||"").toLowerCase()] || session?.user?.email || "someone";
@@ -1283,10 +1656,13 @@ function App({ session, onSignOut }) {
     const { data, error } = await sb.from("budgets").select("state").eq("id", id).maybeSingle();
     if (error || !data || !data.state) return false;
     await backupBefore("Before restoring a backup");
-    const { __backup, ...snap } = data.state;
-    stateRef.current = snap; setState(snap);
-    await doSave(snap);
-    return JSON.stringify(snap) === lastSavedRef.current;
+    const snap = BS.healCategories(unwrap(data.state));
+    try {
+      // Start from what's on the server right now, so the backup replaces it rather than being merged into it.
+      await serial(async () => { const live = await fetchLive(); if (live) setBase(unwrap(live), revOf(live)); put(snap); });
+      clearHistory();
+    } catch (e) { return false; }
+    return doSave();
   };
   const downloadCopy = () => {
     const blob = new Blob([JSON.stringify(stateRef.current, null, 1)], { type: "application/json" });
@@ -1314,7 +1690,7 @@ function App({ session, onSignOut }) {
     await backupBefore("Before archiving the year");
     try {
       await window.saveArchive(yr, state);
-      update((s)=>{ TYPES.forEach((type)=>{ s.plan[type]={}; s.categories[type].forEach((c)=>{ s.plan[type][c]={}; }); }); });
+      update((s)=>{ TYPES.forEach((type)=>{ s.plan[type]={}; s.categories[type].forEach((c)=>{ s.plan[type][c]={}; }); }); }, `archived ${yr}`);
       openMonth(`${yr+1}-01`);
       const a = await window.loadArchives(); setArchives(a||[]);
       alert(`✓ ${yr} archived. You're now budgeting ${yr+1}. You can Restore ${yr} anytime.`);
@@ -1328,7 +1704,11 @@ function App({ session, onSignOut }) {
     await backupBefore(`Before restoring ${yr}`);
     update((s)=>{
       if (a.state.plan) s.plan = structuredClone(a.state.plan);
-      if (a.state.categories) s.categories = structuredClone(a.state.categories);
+      if (a.state.categories) TYPES.forEach((t) => {
+        const arch = a.state.categories[t] || [], cur = s.categories[t] || [];
+        s.categories[t] = [...arch, ...cur.filter((c) => !arch.includes(c))];
+        arch.forEach((c) => unhide(s, t, c));
+      });
       if (a.state.buckets) s.buckets = structuredClone(a.state.buckets);
     });
     setRange({ from: `${yr}-01-01`, to: `${yr}-12-31` });
@@ -1336,6 +1716,9 @@ function App({ session, onSignOut }) {
   };
 
 
+  if (loadError) return <div className="ap-root"><Styles/><div className="ap-loading">
+    <p>Couldn't reach the budget. Nothing was changed.</p>
+    <button className="primary" onClick={load}>Try again</button></div></div>;
   if (!loaded || !state) return <div className="ap-root"><Styles/><p className="ap-loading">Loading…</p></div>;
 
   return (
@@ -1358,13 +1741,13 @@ function App({ session, onSignOut }) {
       {backupsOpen && <BackupsSheet listBackups={listBackups} saveNow={() => backupBefore("Saved by hand")} restoreBackup={restoreBackup} downloadCopy={downloadCopy} onClose={() => setBackupsOpen(false)} />}
       {importOpen && (
         <ImportSheet state={state} userName={NAMES[(session?.user?.email||"").toLowerCase()] || session?.user?.email || "someone"}
-          commitImport={commitImport} undoImport={undoImport} updateImporter={updateImporter} onClose={()=>setImportOpen(false)}/>
+          commitImport={commitImport} undoImport={undoImport} updateImporter={updateImporter} saveCat={addCat} onClose={()=>setImportOpen(false)}/>
       )}
 
       <div className="ap-wrap">
         <header className="ap-head">
           <div>
-            <div className="ap-kicker">Family Budget · <span className="ap-user">{session?.user?.email}</span> · <button className="ap-signout" onClick={handleLogout}>Sign out</button></div>
+            <div className="ap-kicker">Family Budget · <span className="ap-user" title={session?.user?.email}>{NAMES[(session?.user?.email||"").toLowerCase()] || session?.user?.email}</span> <button className="ap-signout" onClick={handleLogout}>Sign out</button></div>
             <h1 className="ap-title">Ramirez Rojas<span className="ap-heart">♥</span><span className="ap-bill">💵</span></h1>
           </div>
           <div className="ap-periodbox">
@@ -1374,7 +1757,7 @@ function App({ session, onSignOut }) {
                   ? <span className="ap-presence"><i className="pdot on"/>{others.map((e)=>NAMES[e]||e.split("@")[0]).join(", ")} online</span>
                   : <span className="ap-presence"><i className="pdot off"/>Just you</span>; })()}
               <span className="ap-saved" style={{opacity: saveStatus==="idle"?0:1, color: saveStatus==="error"?"var(--clay)":saveStatus==="saving"?"var(--ink-soft)":"var(--emerald)", cursor: saveStatus==="error"?"pointer":"default"}}
-                onClick={()=>{ if(saveStatus==="error") doSave(stateRef.current); }}>
+                onClick={()=>{ if(saveStatus==="error") doSave(); }}>
                 {saveStatus==="saving" ? "saving…" : saveStatus==="error" ? "⚠ not saved — tap to retry" : "✓ saved"}
               </span>
             </div>
@@ -1383,18 +1766,19 @@ function App({ session, onSignOut }) {
         </header>
 
         <nav className="ap-tabs">
-          {[["dashboard","Dashboard"],["planning","Planning"],["transactions","Tracking"],["year","By month"],["trends","📊 Trends"],["split","⚖️ Split"]].map(([k,l])=>(
-            <button key={k} className={tab===k?"on":""} onClick={()=>setTab(k)}>{l}</button>
+          {[["dashboard","Dashboard","Home"],["planning","Planning","Plan"],["transactions","Tracking","Tracking"],["year","By month","Months"],["trends","Trends","Trends"],["split","Split","Split"]].map(([k,l,sh])=>(
+            <button key={k} className={tab===k?"on":""} aria-current={tab===k?"page":undefined} onClick={()=>{ setTab(k); window.scrollTo({ top: 0 }); }}>
+              <TabIcon k={k}/><span className="lg">{l}</span><span className="sh" aria-hidden="true">{sh}</span></button>
           ))}
         </nav>
 
         {tab==="dashboard" && (
-          <Dashboard state={state} period={period} addEntry={addEntry} deleteEntry={deleteEntry}/>
+          <Dashboard state={state} period={period} addEntry={addEntry} deleteEntry={deleteEntry} goPlan={()=>setTab("planning")}/>
         )}
         {tab==="planning" && (
           <Planning state={state} period={period} setSetting={setSetting}
-            setPlanAmt={setPlanAmt} addCat={addCat} removeCat={removeCat} renameCat={renameCat}
-            copyBudget={copyBudget} resetPlan={resetPlan}
+            setPlanAmt={setPlanAmt} clearOverride={clearOverride} setCatMeta={setCatMeta} applyPlan={applyPlan}
+            addCat={addCat} removeCat={removeCat} renameCat={renameCat} resetPlan={resetPlan}
             addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket}/>
         )}
         {tab==="year" && (
@@ -1410,12 +1794,31 @@ function App({ session, onSignOut }) {
           <Split state={state} period={period} setSplit={setSplit}/>
         )}
 
+        {(hist.undo || hist.redo || undoMsg) && (
+          <div className="ap-undo" role="region" aria-label="Undo">
+            <span className="ap-undo-what" aria-live="polite">{undoMsg || (hist.undo ? `Last: ${hist.undo}` : "")}</span>
+            <button onClick={undo} disabled={!hist.undo} title={hist.undo ? `Undo: ${hist.undo} (Ctrl+Z / ⌘Z)` : "Nothing to undo"}>↶ Undo</button>
+            <button onClick={redo} disabled={!hist.redo} title={hist.redo ? `Redo: ${hist.redo}` : "Nothing to redo"} aria-label="Redo">↷</button>
+          </div>
+        )}
         <footer className="ap-foot">
           Auto-saves to your shared family budget and syncs live across devices · {state.entries.length} records logged · version {APP_VERSION} · <button className="ap-footlink" onClick={()=>setBackupsOpen(true)}>Backups</button>
         </footer>
       </div>
     </div>
   );
+}
+
+function TabIcon({ k }) {
+  const d = {
+    dashboard: "M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z",
+    planning: "M5 6h14M5 12h14M5 18h14M9 4v4M15 10v4M8 16v4",
+    transactions: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
+    year: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+    trends: "M3 17l6-6 4 4 8-8M15 7h6v6",
+    split: "M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z",
+  }[k];
+  return <svg className="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d}/></svg>;
 }
 
 /* ================= PERIOD: one date range drives every tab ================= */
@@ -1540,7 +1943,11 @@ function budgetSource(state, key, fresh) {
   while (lo <= hi) { const mid = (lo + hi) >> 1; if (keys[mid] <= key) { ans = keys[mid]; lo = mid + 1; } else hi = mid - 1; }
   return ans;
 }
-function planFor(state, type, cat, key, fresh) { const src = budgetSource(state, key, fresh); return src ? (state.plan[type]?.[cat]?.[src] || 0) : 0; }
+function planFor(state, type, cat, key, fresh) {
+  const sc = scheduled(state, type, cat, key);
+  if (sc) { const ov = overrideOf(state, type, cat, key); return ov != null ? ov : sc.auto; }
+  const src = budgetSource(state, key, fresh); return src ? (state.plan[type]?.[cat]?.[src] || 0) : 0;
+}
 function planSum(state, type, cat, months) { return months.reduce((a, k) => a + planFor(state, type, cat, k), 0); }
 // Give `key` its own copy of the budget it currently repeats, so editing it can't change other months.
 function ownMonth(s, key) {
@@ -1555,30 +1962,121 @@ function ownMonth(s, key) {
   if (!(s.planMonths || []).includes(key)) s.planMonths = [...(s.planMonths || []), key].sort();
 }
 
+/* ================= SCHEDULED CATEGORIES =================
+   Some categories follow a schedule instead of repeating last month's number:
+   - income with paydays (every 2 weeks, twice a month, once a month): planned = paychecks that count toward the month × amount
+   - non-monthly costs (due in certain months): the amount in those months, or a monthly set-aside.
+   A schedule applies from its start month on; earlier months keep the budget they had. Typing a different amount for one month
+   is kept as that month's override. Stored in state.catMeta[type][cat] and state.planOverride[type][cat][month]. */
+const metaOf = (state, type, cat) => (state.catMeta && state.catMeta[type] && state.catMeta[type][cat]) || null;
+const overrideOf = (state, type, cat, key) => { const v = state.planOverride && state.planOverride[type] && state.planOverride[type][cat] && state.planOverride[type][cat][key]; return typeof v === "number" ? v : null; };
+function scheduled(state, type, cat, key) {
+  const m = metaOf(state, type, cat); if (!m) return null;
+  if (type === "Income" && m.pay && m.pay.freq && key >= (m.pay.since || "")) {
+    const days = PlanKit.paydays(m.pay, key, incomeShiftDays(state));
+    return { kind: "pay", auto: Math.round(days.length * (+m.pay.amount || 0) * 100) / 100, days };
+  }
+  if (type === "Expenses" && m.kind === "nonmonthly" && m.sched && key >= (m.sched.since || "")) return { kind: "sched", auto: PlanKit.schedAmount(m.sched, key) };
+  return null;
+}
+// Write one category's budget for `months`. One month: the amount repeats into later months. Several: only those months change.
+function writePlan(s, type, cat, months, amt) {
+  const v = amt && amt > 0 ? Math.round(amt * 100) / 100 : 0;
+  const plain = [];
+  months.forEach((k) => {
+    const sc = scheduled(s, type, cat, k);
+    if (!sc) { plain.push(k); return; }
+    s.planOverride = { ...(s.planOverride || {}) }; s.planOverride[type] = { ...(s.planOverride[type] || {}) };
+    const o = { ...(s.planOverride[type][cat] || {}) };
+    if (v === sc.auto) delete o[k]; else o[k] = v;
+    s.planOverride[type][cat] = o;
+  });
+  if (!plain.length) return;
+  if (plain.length > 1) ownMonth(s, addMonths(plain[plain.length - 1], 1));
+  plain.forEach((k) => {
+    ownMonth(s, k);
+    s.plan[type] = s.plan[type] || {}; s.plan[type][cat] = s.plan[type][cat] || {};
+    if (v) s.plan[type][cat][k] = v; else delete s.plan[type][cat][k];
+  });
+}
+
+/* Actual amounts per month (by the month they count toward), for suggestions. */
+function actualsIndex(state) {
+  const by = {}, any = new Set();
+  (state.entries || []).forEach((e) => {
+    if (!e.date || !e.category) return;
+    const k = countsMonth(e, state); any.add(k);
+    const t = (by[k] = by[k] || {}); const c = (t[e.type] = t[e.type] || {});
+    c[e.category] = (c[e.category] || 0) + (+e.amount || 0);
+  });
+  const get = (type, cat, k) => (by[k] && by[k][type] && by[k][type][cat]) || 0;
+  const done = {};
+  const complete = (k) => (done[k] !== undefined ? done[k] : (done[k] = statementGaps(state, k).length === 0));
+  // The last n months before `key` that have data, preferring months whose statements are fully imported.
+  const recent = (key, n) => {
+    const withData = []; for (let i = 1; i <= 12; i++) { const k = addMonths(key, -i); if (any.has(k)) withData.push(k); }
+    const full = withData.filter(complete);
+    return (full.length >= Math.min(n, withData.length) ? full : withData).slice(0, n);
+  };
+  // A month with no spending in this category counts as $0, so occasional costs aren't overstated.
+  const avg = (type, cat, key, n) => { const ms = recent(key, n); return ms.length ? Math.round(ms.reduce((a, k) => a + get(type, cat, k), 0) / ms.length) : 0; };
+  return { get, avg, recent, has: (k) => any.has(k) };
+}
+
+/* Bills vs everyday spending, guessed from the last 3 months with data; anyone can change it per category. */
+const KIND_LABEL = { fixed: "Bill", flex: "Everyday", nonmonthly: "Non-monthly" };
+function autoKinds(state, key, idx) {
+  const ms = idx.recent(key, 3);
+  const out = {};
+  const count = {};
+  (state.entries || []).forEach((e) => { if (e.type === "Expenses" && e.date) { const k = countsMonth(e, state); if (ms.includes(k)) { const id = e.category + "|" + k; count[id] = (count[id] || 0) + 1; } } });
+  (state.categories.Expenses || []).forEach((c) => {
+    out[c] = ms.length >= 2 && PlanKit.looksFixed(ms.map((k) => ({ count: count[c + "|" + k] || 0, sum: idx.get("Expenses", c, k) }))) ? "fixed" : "flex";
+  });
+  return out;
+}
+const kindOf = (state, cat, auto) => { const m = metaOf(state, "Expenses", cat); return (m && m.kind) || (auto && auto[cat]) || "flex"; };
+const PAY_LABEL = { biweekly: "Every 2 weeks", semimonthly: "Twice a month", monthly: "Monthly" };
+const shortDay = (iso) => `${MLABEL[+iso.slice(5, 7) - 1]} ${+iso.slice(8)}`;
+const monthsText = (list) => (list || []).slice().sort((a, b) => a - b).map((m) => MLABEL[m - 1]).join(", ");
+const schedText = (s) => s.mode === "spread"
+  ? `${fmt(+s.amount)} due ${monthsText(s.months)} · ${fmt2(PlanKit.schedAmount(s, "2000-01"))}/mo set aside`
+  : `${fmt(+s.amount)} in ${monthsText(s.months)}`;
+
 /* ================= HEADER FILTER ================= */
 function PeriodBar({ range, setRange, state }) {
   const presets = [["month", "This month", PRESETS.month], ["last", "Last month", PRESETS.last], ["year", "This year", PRESETS.year], ["all", "All time", () => allTimeRange(state)]];
   const same = (r) => r.from === range.from && r.to === range.to;
   const setFrom = (v) => { if (!v) return; setRange(v <= range.to ? { from: v, to: range.to } : { from: v, to: v }); };
   const setTo = (v) => { if (!v) return; setRange(v >= range.from ? { from: range.from, to: v } : { from: v, to: v }); };
+  const [custom, setCustom] = useState(false);
+  const isPreset = presets.some(([, , f]) => same(f()));
   return (
     <div className="ap-periodctl">
       <div className="ap-period">
         <button className="ap-arrow" onClick={() => setRange(shiftRange(range, -1))} aria-label="Previous period">‹</button>
-        <input className="ap-date" type="date" value={range.from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
-        <span className="ap-dash">to</span>
-        <input className="ap-date" type="date" value={range.to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+        <button className="ap-periodlbl" onClick={() => setCustom(!custom)} aria-expanded={custom} title="Pick exact dates">{describeRange(range)}</button>
         <button className="ap-arrow" onClick={() => setRange(shiftRange(range, 1))} aria-label="Next period">›</button>
       </div>
+      {custom && (
+        <div className="ap-period ap-customdates">
+          <input className="ap-date" type="date" value={range.from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+          <span className="ap-dash">to</span>
+          <input className="ap-date" type="date" value={range.to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+        </div>
+      )}
       <div className="ap-presets">
-        {presets.map(([k, l, f]) => { const r = f(); return <button key={k} className={same(r) ? "on" : ""} onClick={() => setRange(r)}>{l}</button>; })}
+        {presets.map(([k, l, f]) => { const r = f(); return <button key={k} className={same(r) ? "on" : ""} onClick={() => { setRange(r); setCustom(false); }}>{l}</button>; })}
+        <button className={custom || !isPreset ? "on soft" : ""} onClick={() => setCustom(!custom)}>Custom</button>
       </div>
     </div>
   );
 }
 
 /* ================= DASHBOARD ================= */
-function Dashboard({ state, period, addEntry, deleteEntry }) {
+function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
+  const dIdx = useMemo(() => actualsIndex(state), [state.entries, state.settings, state.importer]);
+  const dAuto = useMemo(() => autoKinds(state, period.months[0], dIdx), [dIdx, state.categories, period.months[0]]);
   const [q, setQ] = useState("");
   const buckets = Object.keys(state.buckets || {});
   const planAmt = (type, cat) => planSum(state, type, cat, period.months);
@@ -1586,14 +2084,30 @@ function Dashboard({ state, period, addEntry, deleteEntry }) {
   const spentBy = (type) => { const o = {}; monthEntries.filter((e) => e.type === type).forEach((e) => o[e.category] = (o[e.category] || 0) + e.amount); return o; };
 
   const expSpent = spentBy("Expenses");
+  const [showUnbud, setShowUnbud] = useState(false);
   const envelopes = useMemo(() => {
     const cats = [...new Set([...state.categories.Expenses, ...Object.keys(expSpent)])];
-    return cats.map((c) => ({ c, budget: planAmt("Expenses", c), spent: expSpent[c] || 0 }))
+    const one = period.months.length === 1 ? period.months[0] : null;
+    const spentIn = (c, k) => state.entries.reduce((a, e) => a + (e.type === "Expenses" && e.category === c && e.date && countsMonth(e, state) === k ? e.amount : 0), 0);
+    // A non-monthly cost set aside every month: what's available is everything set aside since it was last due, minus what was spent before this month.
+    const fund = (c) => {
+      const m = metaOf(state, "Expenses", c);
+      if (!one || !m || m.kind !== "nonmonthly" || !m.sched || m.sched.mode !== "spread" || one < (m.sched.since || "")) return null;
+      const lastDue = PlanKit.lastDueBefore(m.sched, one);
+      let start = lastDue ? addMonths(lastDue, 1) : addMonths(one, -11);
+      if (m.sched.since && start < m.sched.since) start = m.sched.since;
+      const win = monthsBetween(start, one);
+      const saved = win.reduce((a, k) => a + planFor(state, "Expenses", c, k), 0);
+      const before = win.slice(0, -1).reduce((a, k) => a + spentIn(c, k), 0);
+      return { budget: Math.round((saved - before) * 100) / 100, note: `Set aside since ${monthLabel(start)}: ${fmt(saved)}${before ? `, ${fmt(before)} already used` : ""} · ${fmt(+m.sched.amount)} due ${monthsText(m.sched.months)}` };
+    };
+    return cats.map((c) => { const f = fund(c); return { c, budget: f ? f.budget : planAmt("Expenses", c), spent: expSpent[c] || 0, note: f ? f.note : null }; })
       .filter((e) => e.budget > 0 || e.spent > 0)
       .map((e) => ({ ...e, remaining: e.budget - e.spent }))
       .sort((a, b) => b.budget - a.budget || b.spent - a.spent);
   }, [state, period]);
 
+  const unbudgeted = state.categories.Expenses.filter((c) => !envelopes.some((e) => e.c === c));
   const incBudget = state.categories.Income.reduce((a, c) => a + planAmt("Income", c), 0);
   const expBudget = state.categories.Expenses.reduce((a, c) => a + planAmt("Expenses", c), 0);
   const savBudget = state.categories.Savings.reduce((a, c) => a + planAmt("Savings", c), 0);
@@ -1656,16 +2170,40 @@ function Dashboard({ state, period, addEntry, deleteEntry }) {
         {q && <button onClick={() => setQ("")}>×</button>}
       </div>
 
-      <section className="ap-env-grid">
-        {envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).map((e) => (
-          <Envelope key={e.c} env={e}
+      {(() => {
+        const shown = envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase()));
+        const kindC = (c) => state.categories.Expenses.includes(c) ? kindOf(state, c, dAuto) : "flex";
+        const card = (e, compact) => <Envelope key={e.c} env={e} compact={compact}
             items={monthEntries.filter((x) => x.type === "Expenses" && x.category === e.c)}
             defDate={period.defaultDate} addEntry={addEntry}
-            onDelete={deleteEntry} buckets={buckets} elapsed={elapsed} everyday={variableCats.has(e.c)} periodLabel={period.label} />
-        ))}
+            onDelete={deleteEntry} buckets={buckets} elapsed={elapsed} everyday={variableCats.has(e.c)} periodLabel={period.label} />;
+        const every = shown.filter((e) => kindC(e.c) === "flex"), bills = shown.filter((e) => kindC(e.c) !== "flex");
+        const bBudget = bills.reduce((a, e) => a + e.budget, 0), bSpent = bills.reduce((a, e) => a + e.spent, 0);
+        const paid = bills.filter((e) => e.budget > 0 && e.spent >= e.budget * 0.95).length;
+        return (<>
+          {every.length > 0 && bills.length > 0 && <h3 className="ap-envgroup">Everyday <span className="mono">{fmt(every.reduce((a, e) => a + e.spent, 0))} of {fmt(every.reduce((a, e) => a + e.budget, 0))}</span></h3>}
+          {every.length > 0 && <section className="ap-env-grid">{every.map((e) => card(e, false))}</section>}
+          {bills.length > 0 && <>
+            <h3 className="ap-envgroup">Bills &amp; non-monthly <span className="mono">{paid} of {bills.filter((e) => e.budget > 0).length} paid · {fmt(bSpent)} of {fmt(bBudget)}</span></h3>
+            <section className="ap-billlist">{bills.map((e) => card(e, true))}</section>
+          </>}
+        </>);
+      })()}
+      <section className="ap-env-grid">
         {envelopes.length === 0 && <p className="ap-loading">No expense budget or spending for {period.label}. Set one in Planning.</p>}
-        {envelopes.length > 0 && envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).length === 0 && <p className="ap-loading">No expense category matches "{q}".</p>}
+        {envelopes.length > 0 && envelopes.filter((e) => !q || e.c.toLowerCase().includes(q.toLowerCase())).length === 0 && !unbudgeted.some((c) => c.toLowerCase().includes(q.toLowerCase())) && <p className="ap-loading">No expense category matches "{q}".</p>}
       </section>
+      {(() => { const list = unbudgeted.filter((c) => !q || c.toLowerCase().includes(q.toLowerCase())); return list.length > 0 && (
+        <div className="ap-unbud">
+          <button className="ap-imp-toggle" onClick={() => setShowUnbud(!showUnbud)} aria-expanded={showUnbud || !!q}>
+            <span>Not budgeted in {period.label} <span className="n">{list.length}</span></span><span className="chev">{showUnbud || q ? "Hide" : "Show"}</span>
+          </button>
+          {(showUnbud || q) && <div className="ap-unbud-body">
+            <p>No budget and no spending yet, so they have no card. Spending in them still counts.</p>
+            <div className="ap-unbud-chips">{list.map((c) => <span key={c}>{c}</span>)}</div>
+            {goPlan && <button className="ap-imp-secondary" onClick={goPlan}>Budget them in Planning</button>}
+          </div>}
+        </div>); })()}
 
       <MiniPanel title="Savings" rows={state.categories.Savings} planAmt={(c) => planAmt("Savings", c)} spent={spentBy("Savings")} accent="teal" verb="saved" />
       <MiniPanel title="Income received" rows={state.categories.Income} planAmt={(c) => planAmt("Income", c)} spent={spentBy("Income")} accent="emerald" verb="received" />
@@ -1683,7 +2221,7 @@ function Stat({ label, val, color, hero }) {
   );
 }
 
-function Envelope({ env, items, defDate, addEntry, onDelete, buckets, elapsed, everyday, periodLabel }) {
+function Envelope({ env, items, defDate, addEntry, onDelete, buckets, elapsed, everyday, periodLabel, compact }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [amt, setAmt] = useState("");
@@ -1697,6 +2235,36 @@ function Envelope({ env, items, defDate, addEntry, onDelete, buckets, elapsed, e
     addEntry({ id: uid(), date: defDate, type:"Expenses", category: env.c, amount: Math.round(a*100)/100, note: note.trim(), bucket: bucket||undefined });
     setAmt(""); setNote(""); setBucket(""); setAdding(false);
   };
+  const paid = env.budget > 0 && env.spent >= env.budget * 0.95;
+  if (compact) return (
+    <div className={"ap-env ap-bill" + (over && Math.round(env.spent - env.budget) > Math.max(2, env.budget * 0.05) ? " over" : "")}>
+      <div className="ap-bill-row">
+        <span className="ap-env-name" onClick={()=>items.length&&setOpen(!open)} style={{cursor:items.length?"pointer":"default"}}>{env.c}{items.length>0 && <em className="ap-cnt">{items.length}</em>}</span>
+        <span className={"ap-bill-st" + (paid ? " paid" : "")}>
+          {paid ? (Math.round(env.spent - env.budget) > Math.max(2, env.budget * 0.05) ? `Paid · ${fmt(env.spent - env.budget)} over` : "✓ Paid")
+            : env.spent > 0 ? `${fmt(env.spent)} of ${fmt(env.budget)}` : env.budget > 0 ? `${fmt(env.budget)} due` : `${fmt(env.spent)} · no budget`}</span>
+        <button className="ap-envadd" onClick={()=>setAdding(!adding)} aria-label={`Add to ${env.c}`}>{adding?"Cancel":"+ Add"}</button>
+      </div>
+      {env.note && <div className="ap-envnote">{env.note}</div>}
+      {adding && (
+        <div className="ap-envform">
+          <span className="cur">$</span>
+          <input className="amt" type="text" inputMode="decimal" enterKeyHint="done" autoFocus onFocus={selectAll} placeholder="0.00" value={amt}
+            onChange={(e)=>setAmt(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          <input className="note" type="text" placeholder="note (optional)" value={note} onChange={(e)=>setNote(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
+          <button className="ap-envgo" onClick={submit}>Log</button>
+        </div>
+      )}
+      {open && (
+        <ul className="ap-env-items">
+          {items.map((x)=>(
+            <li key={x.id}><span className="d">{x.date.slice(8)}</span><span className="n">{x.note||x.name||"—"}</span>
+              <span className="a mono">{fmt2(x.amount)}</span><button className="x" onClick={()=>onDelete(x.id)} title="Delete" aria-label="Delete">×</button></li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
   return (
     <div className={"ap-env"+(over?" over":"")}>
       <div className="ap-env-top">
@@ -1711,6 +2279,7 @@ function Envelope({ env, items, defDate, addEntry, onDelete, buckets, elapsed, e
       {everyday && elapsed && env.budget>0 && !over && env.spent/env.budget > elapsed+0.1 && env.spent/elapsed > env.budget && (
         <div className="ap-pace">At this pace about {fmt(env.spent/elapsed)} by the end of {periodLabel}, {fmt(env.spent/elapsed-env.budget)} over.</div>
       )}
+      {env.note && <div className="ap-envnote">{env.note}</div>}
       <div className="ap-env-foot">
         <span className="mono">{fmt(env.spent)} <span className="dim">{env.budget>0?"of "+fmt(env.budget):"no budget"}</span></span>
         <button className="ap-envadd" onClick={()=>setAdding(!adding)}>{adding?"Cancel":"+ Add"}</button>
@@ -1718,7 +2287,7 @@ function Envelope({ env, items, defDate, addEntry, onDelete, buckets, elapsed, e
       {adding && (
         <div className="ap-envform">
           <span className="cur">$</span>
-          <input className="amt" type="number" autoFocus placeholder="0.00" value={amt}
+          <input className="amt" type="text" inputMode="decimal" enterKeyHint="done" autoFocus onFocus={selectAll} placeholder="0.00" value={amt}
             onChange={(e)=>setAmt(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
           <input className="note" type="text" placeholder="note (optional)" value={note}
             onChange={(e)=>setNote(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()}/>
@@ -1825,7 +2394,7 @@ function AddBar({ state, defDate, addEntry }) {
         <div className="bktwrap"><Combo value={bucket} onChange={(v)=>setBucket(v==="No bucket"?"":v)} options={["No bucket", ...buckets]} placeholder="Bucket…"/></div>
       )}
       <input type="date" value={date} onChange={(e)=>setDate(e.target.value)}/>
-      <input className="amt" type="number" placeholder="0.00" value={amount}
+      <input className="amt" type="text" inputMode="decimal" enterKeyHint="done" onFocus={selectAll} placeholder="0.00" value={amount}
         onChange={(e)=>setAmount(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&add()}/>
       <input className="note" type="text" placeholder="note (optional)" value={note}
         onChange={(e)=>setNote(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&add()}/>
@@ -1836,55 +2405,85 @@ function AddBar({ state, defDate, addEntry }) {
 
 /* ================= PLANNING ================= */
 /* ================= PLANNING ================= */
-function Planning({ state, period, setSetting, setPlanAmt, addCat, removeCat, renameCat, copyBudget, resetPlan, addBucket, renameBucket, deleteBucket }) {
+function Planning({ state, period, setSetting, setPlanAmt, clearOverride, setCatMeta, applyPlan, addCat, removeCat, renameCat, resetPlan, addBucket, renameBucket, deleteBucket }) {
   const months = period.months;
   const single = months.length === 1;
   const first = months[0], last = months[months.length - 1];
+  const idx = useMemo(() => actualsIndex(state), [state.entries, state.settings, state.importer]);
+  const auto = useMemo(() => autoKinds(state, first, idx), [idx, state.categories, first]);
   const perMonth = (type, c) => { const vals = months.map((k) => planFor(state, type, c, k)); return vals.every((v) => v === vals[0]) ? vals[0] : null; };
-  const total = (type) => state.categories[type].reduce((a, c) => a + planSum(state, type, c, months), 0);
-  const toAllocate = total("Income") - total("Expenses") - total("Savings");
+  const total = (type, cats) => (cats || state.categories[type]).reduce((a, c) => a + planSum(state, type, c, months), 0);
+  const toAllocate = Math.round((total("Income") - total("Expenses") - total("Savings")) * 100) / 100;
   const prevKey = addMonths(first, -1);
-  const prevEntries = state.entries.filter((e) => e.date && countsMonth(e, state) === prevKey);
-  const actual = (type, c) => prevEntries.filter((e) => e.type === type && e.category === c).reduce((a, e) => a + e.amount, 0);
-  // suggestions: average of the last 3 months that have data and whose statements are fully imported
-  const avgMonths = useMemo(() => [1, 2, 3].map((n) => addMonths(first, -n))
-    .filter((k) => statementGaps(state, k).length === 0 && state.entries.some((e) => e.date && countsMonth(e, state) === k)), [state, first]);
-  const avgFor = (type, c) => {
-    if (!avgMonths.length) return null;
-    const tot = state.entries.filter((e) => e.type === type && e.category === c && avgMonths.includes(countsMonth(e, state))).reduce((a, e) => a + e.amount, 0);
-    return tot > 0 ? Math.round(tot / avgMonths.length) : null;
-  };
-  const fillFromAverages = () => {
-    let n = 0;
-    TYPES.forEach((t) => state.categories[t].forEach((c) => { const v = avgFor(t, c); if (v && !perMonth(t, c)) { setPlanAmt(t, c, months, v); n++; } }));
-    setMsg(n ? { ok: true, text: `Filled ${n} empty budgets with their ${avgMonths.length}-month averages.` } : { ok: false, text: "No empty budgets with spending history to fill." });
-  };
   const src = single ? budgetSource(state, first) : null;
   const inherited = !!(single && src && src !== first);
-  const sources = budgetedMonths(state).slice().reverse().filter((k) => !months.includes(k));
-  const [srcKey, setSrcKey] = useState("");
+  const [sheet, setSheet] = useState(null);           // { mode: "start" } | { mode: "cat", type, cat }
   const [msg, setMsg] = useState(null);
-  const sourcesSig = sources.join(",");
-  useEffect(() => { setMsg(null); setSrcKey(sources.find((k) => k < first) || sources[0] || ""); }, [first, last, sourcesSig]);
+  const [showBuckets, setShowBuckets] = useState(false);
+  useEffect(() => setMsg(null), [first, last]);
+
+  // ---- leftover: one tap puts it into (or takes it from) a category
+  const everydayBiggest = () => state.categories.Expenses.filter((c) => kindOf(state, c, auto) === "flex").sort((a, b) => planFor(state, "Expenses", b, first) - planFor(state, "Expenses", a, first))[0];
+  const defaultTarget = toAllocate > 0 ? (state.categories.Savings[0] ? ["Savings", state.categories.Savings[0]] : null) : (everydayBiggest() ? ["Expenses", everydayBiggest()] : null);
+  const [balTo, setBalTo] = useState("");
+  const target = balTo ? JSON.parse(balTo) : defaultTarget;
+  const balance = () => {
+    if (!target) return;
+    const [t, c] = target, cur = planFor(state, t, c, first);
+    const next = Math.max(0, Math.round((cur + toAllocate) * 100) / 100);
+    setPlanAmt(t, c, months, next);
+    const moved = Math.abs(next - cur), left = Math.round((Math.abs(toAllocate) - moved) * 100) / 100;
+    setMsg({ ok: left === 0, text: toAllocate > 0 ? `Added ${fmt2(moved)} to ${c}. Everything is assigned.`
+      : left > 0 ? `Took ${fmt2(moved)} from ${c} (all it had). Still over by ${fmt2(left)}. Pick another category.` : `Took ${fmt2(moved)} from ${c}. The plan balances now.` });
+    setBalTo("");
+  };
+
+  const rowProps = (type, c) => {
+    const m = metaOf(state, type, c);
+    const sc = single ? scheduled(state, type, c, first) : null;
+    let tag = null, sub = null;
+    if (type === "Income") {
+      tag = m && m.pay && m.pay.freq ? PAY_LABEL[m.pay.freq] : "Set paydays";
+      if (m && m.pay && m.pay.freq) sub = sc ? `${sc.days.length} payday${sc.days.length === 1 ? "" : "s"} × ${fmt2(+m.pay.amount || 0)}${sc.days.length ? ` · ${sc.days.map(shortDay).join(", ")}` : ""}` : `Paydays start ${monthLabel(m.pay.since)}`;
+    } else if (type === "Expenses") {
+      const kd = kindOf(state, c, auto);
+      tag = KIND_LABEL[kd] + (m && m.kind ? "" : " (auto)");
+      if (kd === "nonmonthly") sub = m && m.sched ? schedText(m.sched) : "Tap “Non-monthly” to set when it's due";
+    }
+    const over = !!(sc && overrideOf(state, type, c, first) != null);
+    return {
+      name: c, amount: perMonth(type, c), actual: idx.get(type, c, prevKey), avg: idx.avg(type, c, first, 3) || null,
+      inherited: inherited && !sc, tag, sub, over,
+      resetLabel: type === "Income" ? `use paydays (${fmt(sc ? sc.auto : 0)})` : `use schedule (${fmt(sc ? sc.auto : 0)})`,
+      onTag: type === "Savings" ? null : () => setSheet({ mode: "cat", type, cat: c }),
+      onReset: () => clearOverride(type, c, months),
+      onAmount: (v) => setPlanAmt(type, c, months, v), onRename: (n) => renameCat(type, c, n), onRemove: () => removeCat(type, c),
+    };
+  };
+  const expGroups = [["fixed", "Bills", "Same every month. They repeat on their own."], ["flex", "Everyday", "Changes month to month. Last month and the 3-month average are next to each one."], ["nonmonthly", "Non-monthly", "Due a few times a year: insurance, fees, seasons."]]
+    .map(([k, title, hint]) => { const cats = state.categories.Expenses.filter((c) => kindOf(state, c, auto) === k); return { key: k, title, hint, cats, total: total("Expenses", cats) }; });
 
   return (
     <section className="ap-plan">
       <div className="ap-plan-bar">
-        <div className={"ap-alloc" + (toAllocate === 0 ? " ok" : toAllocate < 0 ? " neg" : "")}>
+        <div className={"ap-alloc" + (Math.round(toAllocate) === 0 ? " ok" : toAllocate < 0 ? " neg" : "")}>
           <span>{single ? "To allocate" : `To allocate, ${months.length} months`}</span><b>{fmt(toAllocate)}</b>
         </div>
         <div className="ap-plan-actions">
-          <div className="ap-copyfrom">
-            <span>Copy from</span>
-            <select value={srcKey} onChange={(e) => setSrcKey(e.target.value)} disabled={!sources.length} aria-label="Month to copy from">
-              {sources.length ? sources.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>) : <option value="">No budgeted months yet</option>}
-            </select>
-            <button onClick={() => setMsg(copyBudget(srcKey, months))} disabled={!srcKey}>Copy</button>
-          </div>
-          <button className="ghost" onClick={fillFromAverages} disabled={!avgMonths.length} title="Uses the last 3 complete months">Fill empty from averages</button>
-          <button className="ghost" onClick={resetPlan}>Reset to original</button>
+          <button onClick={() => setSheet({ mode: "start" })}>Plan {single ? MLABEL[+first.slice(5) - 1] : "these months"} from…</button>
         </div>
       </div>
+      {single && Math.round(toAllocate) !== 0 && target && (
+        <div className={"ap-balance" + (toAllocate < 0 ? " neg" : "")}>
+          <span>{toAllocate > 0 ? <><b>{fmt2(toAllocate)}</b> isn't assigned yet. Put it in</> : <>Over by <b>{fmt2(-toAllocate)}</b>. Take it from</>}</span>
+          <select value={JSON.stringify(target)} onChange={(e) => setBalTo(e.target.value)} aria-label="Category">
+            <optgroup label="Savings">{state.categories.Savings.map((c) => <option key={c} value={JSON.stringify(["Savings", c])}>{c}</option>)}</optgroup>
+            <optgroup label="Expenses">{state.categories.Expenses.map((c) => <option key={c} value={JSON.stringify(["Expenses", c])}>{c}{toAllocate < 0 ? ` (${fmt(planFor(state, "Expenses", c, first))})` : ""}</option>)}</optgroup>
+          </select>
+          <button onClick={balance}>{toAllocate > 0 ? "Add it" : "Take it"}</button>
+        </div>
+      )}
+      {!single && Math.round(toAllocate) !== 0 && <p className="ap-plan-hint">To balance the leftover in one tap, pick a single month.</p>}
       {msg && <div className={"ap-planmsg" + (msg.ok ? "" : " err")}>{msg.text}</div>}
 
       <p className="ap-plan-hint">
@@ -1893,23 +2492,36 @@ function Planning({ state, period, setSetting, setPlanAmt, addCat, removeCat, re
           : <>Editing <b>{period.label}</b>. An amount you type applies to each of these {months.length} months only; {monthLabel(addMonths(last, 1))} keeps its own budget. Rows marked "varies" differ between these months.</>}
         {" "}Aim to bring "To allocate" to $0.
       </p>
-      <label className="ap-paysetting">
-        Paychecks in the last
-        <select value={incomeShiftDays(state)} onChange={(e) => setSetting("incomeShiftDays", +e.target.value)} aria-label="Days before month-end">
-          {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? "0 days (off)" : n === 1 ? "1 day" : n + " days"}</option>)}
-        </select>
-        of a month count toward the next month's budget.
-      </label>
       {inherited && <p className="ap-inherit-note">{monthLabel(first)} doesn't have its own budget yet, so it's repeating <b>{monthLabel(src)}</b>. Change any amount and {MLABEL[+first.slice(5) - 1]} gets its own budget; later months follow it.</p>}
 
-      <BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket} />
+      <PlanSection type="Income" total={total("Income")} actualLabel={MLABEL[+prevKey.slice(5) - 1]} perMonthLabel={single ? "Budget" : "Per month"}
+        groups={[{ key: "all", cats: state.categories.Income }]} rowProps={(c) => rowProps("Income", c)} addCat={(n) => addCat("Income", n)}
+        footer={<label className="ap-paysetting">
+          Paychecks in the last
+          <select value={incomeShiftDays(state)} onChange={(e) => setSetting("incomeShiftDays", +e.target.value)} aria-label="Days before month-end">
+            {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? "0 days (off)" : n === 1 ? "1 day" : n + " days"}</option>)}
+          </select>
+          of a month count toward the next month.
+        </label>} />
+      <PlanSection type="Expenses" total={total("Expenses")} actualLabel={MLABEL[+prevKey.slice(5) - 1]} perMonthLabel={single ? "Budget" : "Per month"}
+        groups={expGroups} rowProps={(c) => rowProps("Expenses", c)} addCat={(n) => addCat("Expenses", n)}
+        footer={<p className="ap-plan-hint" style={{ margin: "10px 0 0" }}>“(auto)” means the app guessed from the last 3 months. Tap the label to change it.</p>} />
+      <PlanSection type="Savings" total={total("Savings")} actualLabel={MLABEL[+prevKey.slice(5) - 1]} perMonthLabel={single ? "Budget" : "Per month"}
+        groups={[{ key: "all", cats: state.categories.Savings }]} rowProps={(c) => rowProps("Savings", c)} addCat={(n) => addCat("Savings", n)} />
 
-      {TYPES.map((type) => (
-        <PlanSection key={type} type={type} cats={state.categories[type]} planAmt={(c) => perMonth(type, c)}
-          total={total(type)} setPlanAmt={(c, v) => setPlanAmt(type, c, months, v)}
-          actual={(c) => actual(type, c)} avg={(c) => avgFor(type, c)} actualLabel={MLABEL[+prevKey.slice(5) - 1]} inherited={inherited} perMonthLabel={single ? "Budget" : "Per month"}
-          addCat={(n) => addCat(type, n)} removeCat={(c) => removeCat(type, c)} renameCat={(o, n) => renameCat(type, o, n)} />
-      ))}
+      <button className="ap-imp-toggle" onClick={() => setShowBuckets(!showBuckets)} aria-expanded={showBuckets}>
+        <span>Buckets <span className="n">{Object.keys(state.buckets || {}).length}</span></span><span className="chev">{showBuckets ? "Hide" : "Show"}</span>
+      </button>
+      {showBuckets && <BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket} />}
+      <div className="ap-plan-danger">
+        <button className="ap-imp-secondary" onClick={resetPlan}>Reset to original plan…</button>
+        <span>Puts categories and amounts back to the starting plan. Transactions are kept, and you can Undo.</span>
+      </div>
+
+      {sheet && sheet.mode === "start" && <StartFromSheet state={state} period={period} idx={idx} auto={auto} applyPlan={applyPlan}
+        onClose={() => setSheet(null)} onDone={(text) => { setSheet(null); setMsg({ ok: true, text }); }} />}
+      {sheet && sheet.mode === "cat" && <CatSheet state={state} type={sheet.type} cat={sheet.cat} first={first} auto={auto} setCatMeta={setCatMeta}
+        onClose={() => setSheet(null)} onDone={(text) => { setSheet(null); setMsg({ ok: true, text }); }} />}
     </section>
   );
 }
@@ -1959,67 +2571,356 @@ function BucketName({ name, onRename }) {
   );
 }
 
-function PlanSection({ type, cats, planAmt, total, setPlanAmt, actual, avg, actualLabel, inherited, perMonthLabel, addCat, removeCat, renameCat }) {
+function PlanSection({ type, groups, total, rowProps, actualLabel, perMonthLabel, addCat, footer }) {
   const [newCat, setNewCat] = useState("");
   const tone = type === "Income" ? "emerald" : type === "Savings" ? "teal" : "clay";
+  const any = groups.some((g) => g.cats.length);
+  const add = () => { addCat(newCat); setNewCat(""); };
   return (
     <div className="ap-plansec">
       <div className="ap-plansec-head">
         <h3 style={{ color: `var(--${tone})` }}>{type}</h3>
         <span className="mono total">{fmt(total)}</span>
       </div>
-      {cats.length > 0 && <div className="ap-planlegend"><span>{actualLabel} actual · avg</span><span>{perMonthLabel}</span></div>}
-      <div className="ap-planrows">
-        {cats.map((c) => (
-          <PlanRow key={c} name={c} amount={planAmt(c)} actual={actual(c)} avg={avg(c)} actualLabel={actualLabel} inherited={inherited}
-            onAmount={(v) => setPlanAmt(c, v)} onRename={(n) => renameCat(c, n)} onRemove={() => removeCat(c)} />
-        ))}
-        {cats.length === 0 && <p className="ap-empty">No categories yet.</p>}
-      </div>
+      {any && <div className="ap-planlegend"><span>{actualLabel} actual · avg</span><span>{perMonthLabel}</span></div>}
+      {groups.map((g) => (
+        <div key={g.key} className="ap-plangroup">
+          {g.title && <div className="ap-plangroup-head"><span>{g.title}</span><span className="mono">{fmt(g.total)}</span></div>}
+          {g.title && g.cats.length > 0 && <p className="ap-plangroup-hint">{g.hint}</p>}
+          <div className="ap-planrows">
+            {g.cats.map((c) => <PlanRow key={c} {...rowProps(c)} />)}
+            {g.title && g.cats.length === 0 && <p className="ap-plangroup-hint">None yet. {g.hint}</p>}
+          </div>
+        </div>
+      ))}
+      {!any && <p className="ap-empty">No categories yet.</p>}
       <div className="ap-addcat">
         <input type="text" placeholder={"+ add " + type.toLowerCase().replace(/s$/, "") + " category"} value={newCat}
-          onChange={(e) => setNewCat(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { addCat(newCat); setNewCat(""); } }} />
-        <button onClick={() => { addCat(newCat); setNewCat(""); }}>Add</button>
+          onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+        <button onClick={add}>Add</button>
       </div>
+      {footer}
     </div>
   );
 }
 
-function PlanRow({ name, amount, actual, avg, actualLabel, inherited, onAmount, onRename, onRemove }) {
+function PlanRow({ name, amount, actual, avg, inherited, tag, sub, over, resetLabel, onTag, onReset, onAmount, onRename, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [amtFocus, setAmtFocus] = useState(false);
   useEffect(() => setDraft(name), [name]);
   const varies = amount === null;
-  const shownAmt = varies ? "" : amtFocus ? (amount || "") : (amount ? amount.toLocaleString("en-US") : "");
   return (
-    <div className="ap-planrow">
-      {editing ? (
-        <input className="ap-renamein" value={draft} autoFocus
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => { onRename(draft); setEditing(false); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { onRename(draft); setEditing(false); } if (e.key === "Escape") { setDraft(name); setEditing(false); } }} />
-      ) : (
-        <span className="ap-planrow-name" onClick={() => setEditing(true)} title="Click to rename">{name}</span>
-      )}
+    <div className={"ap-planrow" + (amount === 0 && !amtFocus ? " zero" : "")}>
+      <div className="ap-planrow-main">
+        <div className="ap-planrow-top">
+          {editing ? (
+            <input className="ap-renamein" value={draft} autoFocus
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => { onRename(draft); setEditing(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { onRename(draft); setEditing(false); } if (e.key === "Escape") { setDraft(name); setEditing(false); } }} />
+          ) : (
+            <span className="ap-planrow-name" onClick={() => setEditing(true)} title="Click to rename">{name}</span>
+          )}
+          {tag && onTag && <button className="ap-kind" onClick={onTag}>{tag}</button>}
+        </div>
+        {(sub || over) && <div className="ap-planrow-sub">{sub}{over && <> · <b>changed for this month</b> <button className="ap-linkbtn" onClick={onReset}>↺ {resetLabel}</button></>}</div>}
+      </div>
       <span className="ap-actual mono">
-        <span title={`Actually spent or received in ${actualLabel}`}>{actual ? fmt(actual) : "—"}</span>
+        <span title="Actually spent or received last month">{actual ? fmt(actual) : "—"}</span>
         {avg != null && avg !== amount && <button className="ap-avg" onClick={() => onAmount(avg)} title="Use the 3-month average as this budget">avg {fmt(avg)}</button>}
       </span>
       <div className={"ap-amtwrap" + (inherited && !amtFocus ? " inherited" : "")}>
         <span className="cur">$</span>
-        <input type="text" inputMode="decimal" value={shownAmt} placeholder={varies ? "varies" : "0"} aria-label={`Budget for ${name}`}
-          onFocus={() => setAmtFocus(true)} onBlur={() => setAmtFocus(false)}
-          onChange={(e) => onAmount(parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)} />
+        <span onFocus={() => setAmtFocus(true)} onBlur={() => setAmtFocus(false)} style={{ display: "contents" }}>
+          <MoneyInput value={varies ? null : amount} onValue={onAmount} placeholder={varies ? "varies" : "0"} ariaLabel={`Budget for ${name}`} /></span>
       </div>
       <button className="ap-del" onClick={onRemove} title="Remove category">×</button>
     </div>
   );
 }
 
+/* ---- sheet shell shared by the planning sheets ---- */
+function Sheet({ title, sub, onClose, children, foot, label }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+  return (
+    <div className="ap-imp-overlay" role="dialog" aria-modal="true" aria-label={label || title}>
+      <div className="ap-imp-sheet ap-psheet">
+        <header className="ap-imp-head">
+          <div><h2 className="ap-imp-title">{title}</h2>{sub && <p className="ap-imp-sub">{sub}</p>}</div>
+          <div className="ap-imp-headbtns"><button className="ap-imp-close" onClick={onClose} aria-label="Close">×</button></div>
+        </header>
+        <div className="ap-imp-body">{children}</div>
+        {foot && <div className="ap-psheet-foot">{foot}</div>}
+      </div>
+    </div>
+  );
+}
 
-/* ================= TRANSACTIONS ================= */
+/* ---- "Plan <month> from…": fill a month from a past budget or past spending, with a preview you can adjust ---- */
+function StartFromSheet({ state, period, idx, auto, applyPlan, onClose, onDone }) {
+  const months = period.months, first = months[0];
+  const target = months.length === 1 ? monthLabel(first) : period.label;
+  const budgeted = budgetedMonths(state).filter((k) => !months.includes(k)).slice().reverse();
+  const prev = addMonths(first, -1), ly = addMonths(first, -12);
+  const [src, setSrc] = useState("budget");
+  const [bm, setBm] = useState(budgeted.find((k) => k < first) || budgeted[0] || "");
+  const [keep, setKeep] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const spending = src !== "budget";
+  const SOURCES = [
+    ["budget", "A month's budget", "Copies what you planned"],
+    ["spent1", `What happened in ${monthLabel(prev)}`, "Actual spending and income"],
+    ["avg3", "Average of the last 3 months", "Actual spending and income"],
+    ["avg6", "Average of the last 6 months", "Actual spending and income"],
+    ["lastyear", `Same month last year (${monthLabel(ly)})`, "Actual spending and income"],
+  ];
+  const srcVal = (t, c) => src === "budget" ? (bm ? planFor(state, t, c, bm) : 0)
+    : src === "spent1" ? Math.round(idx.get(t, c, prev)) : src === "avg3" ? idx.avg(t, c, first, 3) : src === "avg6" ? idx.avg(t, c, first, 6) : Math.round(idx.get(t, c, ly));
+  const srcShort = src === "budget" ? (bm ? `${MLABEL[+bm.slice(5) - 1]} budget` : "") : src === "spent1" ? `${MLABEL[+prev.slice(5) - 1]} actual` : src === "avg3" ? "3-mo avg" : src === "avg6" ? "6-mo avg" : `${monthLabel(ly)} actual`;
+  const current = (t, c) => { const vals = months.map((k) => planFor(state, t, c, k)); return vals.every((v) => v === vals[0]) ? vals[0] : null; };
+  const groupOf = (t, c) => t === "Expenses" ? { fixed: "Bills", flex: "Everyday", nonmonthly: "Non-monthly" }[kindOf(state, c, auto)] : t;
+
+  const rows = useMemo(() => {
+    const out = [];
+    TYPES.forEach((t) => state.categories[t].forEach((c) => {
+      const cur = current(t, c), sv = srcVal(t, c), group = groupOf(t, c);
+      const sc = scheduled(state, t, c, first);
+      let proposed, why;
+      if (sc) { proposed = cur != null ? cur : sc.auto; why = t === "Income" ? "from paydays" : "from its schedule"; }
+      else if (spending && keep && group === "Bills" && cur > 0) { proposed = cur; why = "bill, kept"; }
+      else if (spending && !(sv > 0) && cur > 0) { proposed = cur; why = "nothing recorded, kept"; }
+      else { proposed = sv; why = sv > 0 ? srcShort : ""; }
+      out.push({ id: t + "|" + c, t, c, group, cur, sv, proposed, why, fixedSched: !!sc, avg: idx.avg(t, c, first, 3) });
+    }));
+    return out;
+  }, [src, bm, keep]);
+  const [sel, setSel] = useState({});
+  useEffect(() => { const s = {}; rows.forEach((r) => { s[r.id] = { on: r.proposed > 0, amt: r.proposed > 0 ? String(r.proposed) : "" }; }); setSel(s); }, [rows]);
+  const [open, setOpen] = useState({});
+  const val = (r) => { const s = sel[r.id]; if (!s || !s.on) return 0; const v = parseFloat(String(s.amt).replace(/[^0-9.]/g, "")); return v > 0 ? Math.round(v * 100) / 100 : 0; };
+  const toggle = (r) => setSel((m) => { const s = m[r.id] || { on: false, amt: "" }; const on = !s.on; const sug = r.proposed || r.avg || r.cur || ""; return { ...m, [r.id]: { on, amt: on && !s.amt ? (sug ? String(sug) : "") : s.amt } }; });
+  const setAmt = (r, v) => setSel((m) => ({ ...m, [r.id]: { on: true, amt: v } }));
+  const changes = rows.filter((r) => sel[r.id] && (r.cur == null ? !(r.fixedSched && val(r) === r.proposed) : val(r) !== r.cur));
+  const sum = (t) => rows.filter((r) => r.t === t).reduce((a, r) => a + val(r), 0);
+  const left = Math.round((sum("Income") - sum("Expenses") - sum("Savings")) * 100) / 100;
+  const apply = async () => {
+    setBusy(true);
+    await applyPlan(months, changes.map((r) => ({ type: r.t, cat: r.c, amount: val(r) })), `Before planning ${target}`);
+    setBusy(false);
+    onDone(`Planned ${target}: ${changes.length} ${changes.length === 1 ? "category" : "categories"} updated. A backup was saved first.`);
+  };
+
+  const GROUPS = ["Income", "Bills", "Everyday", "Non-monthly", "Savings"];
+  const visible = (r) => r.cur > 0 || r.proposed > 0 || (sel[r.id] && sel[r.id].on);
+  // A plain function (not a component) so typing in an amount never re-creates the input and drops focus.
+  const rowEl = (r) => {
+    const s = sel[r.id] || { on: false, amt: "" };
+    const removed = !s.on && r.cur > 0;
+    const bits = [r.cur == null ? "Now: varies" : r.cur > 0 ? `Now ${fmt(r.cur)}` : "Not budgeted now"];
+    if (r.why && s.on) bits.push(r.why);
+    if (spending && r.why !== srcShort && r.sv > 0) bits.push(`${srcShort} ${fmt(r.sv)}`);
+    if (!spending && r.avg > 0) bits.push(`avg ${fmt(r.avg)}`);
+    return (
+      <div key={r.id} className={"ap-sf-row" + (s.on ? "" : " off")}>
+        <label className="ap-sf-name">
+          <input type="checkbox" checked={s.on} onChange={() => toggle(r)} aria-label={`Include ${r.c}`} />
+          <span><b>{r.c}</b>
+            <span className="ap-sf-sub">{removed ? <span className="rm">Will be removed from {target} (now {fmt(r.cur)})</span> : bits.join(" · ")}</span></span>
+        </label>
+        <div className="ap-amtwrap">
+          <span className="cur">$</span>
+          <input type="text" inputMode="decimal" onFocus={selectAll} value={s.amt} placeholder={r.avg ? String(r.avg) : "0"} aria-label={`Amount for ${r.c}`}
+            onChange={(e) => setAmt(r, e.target.value)} />
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Sheet title={`Plan ${target}`} label="Plan from" onClose={onClose}
+      sub="Pick where to start. Nothing changes until you tap Apply, and a backup is saved first."
+      foot={<>
+        <div className="ap-sf-tot">
+          <span>Income <b className="mono">{fmt(sum("Income"))}</b></span>
+          <span>Expenses <b className="mono">{fmt(sum("Expenses"))}</b></span>
+          <span>Savings <b className="mono">{fmt(sum("Savings"))}</b></span>
+          <span className={Math.round(left) === 0 ? "ok" : left < 0 ? "neg" : ""}>To allocate <b className="mono">{fmt(left)}</b></span>
+        </div>
+        <div className="ap-imp-footbtns">
+          <button className="ap-imp-secondary" onClick={onClose}>Cancel</button>
+          <button className="ap-imp-primary" disabled={busy || !changes.length} onClick={apply}>
+            {changes.length ? `Apply ${changes.length} change${changes.length === 1 ? "" : "s"}` : "No changes"}</button>
+        </div>
+      </>}>
+      <div className="ap-sf-sources" role="radiogroup" aria-label="Start from">
+        {SOURCES.map(([k, label, hint]) => (
+          <label key={k} className={"ap-sf-src" + (src === k ? " on" : "")}>
+            <input type="radio" name="sf-src" checked={src === k} onChange={() => setSrc(k)} />
+            <span><b>{label}</b><span className="ap-sf-sub">{hint}</span>
+              {k === "budget" && src === "budget" && (
+                <select value={bm} onChange={(e) => setBm(e.target.value)} disabled={!budgeted.length} aria-label="Month to copy">
+                  {budgeted.length ? budgeted.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>) : <option value="">No budgeted months yet</option>}
+                </select>)}
+            </span>
+          </label>
+        ))}
+      </div>
+      {spending && <label className="ap-sf-keep"><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Keep bills at their current amounts (a late or skipped bill would throw off past spending)</label>}
+      <p className="ap-imp-fine" style={{ margin: "0 0 12px" }}>Untick a category to leave it out of {target}. Categories with nothing planned are under “Show” in each group, ready to add.</p>
+      {GROUPS.map((g) => {
+        const list = rows.filter((r) => r.group === g); if (!list.length) return null;
+        const shown = list.filter(visible), hidden = list.filter((r) => !visible(r));
+        return (
+          <div key={g} className="ap-sf-group">
+            <h3>{g} <span className="mono">{fmt(list.reduce((a, r) => a + val(r), 0))}</span></h3>
+            {shown.map(rowEl)}
+            {hidden.length > 0 && (
+              <>
+                <button className="ap-linkbtn ap-sf-more" onClick={() => setOpen((o) => ({ ...o, [g]: !o[g] }))}>
+                  {open[g] ? "Hide" : "Show"} {hidden.length} with nothing planned</button>
+                {open[g] && hidden.map(rowEl)}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </Sheet>
+  );
+}
+
+/* ---- a category's kind and schedule: bill / everyday / non-monthly, or paydays for income ---- */
+function CatSheet({ state, type, cat, first, auto, setCatMeta, onClose, onDone }) {
+  const meta = metaOf(state, type, cat) || {};
+  const shift = incomeShiftDays(state);
+  const startOpts = [0, 1, 2, 3, 4, 5, 6].map((n) => addMonths(first, n));
+  const detected = useMemo(() => type === "Income" ? PlanKit.detectPay(state.entries.filter((e) => e.type === "Income" && e.category === cat), localToday()) : null, []);
+  // non-monthly: which months had spending in the last 12, and the typical amount
+  const history = useMemo(() => {
+    if (type !== "Expenses") return null;
+    const byM = {};
+    state.entries.forEach((e) => { if (e.type === "Expenses" && e.category === cat && e.date) { const k = countsMonth(e, state); if (k < first && k >= addMonths(first, -12)) byM[k] = (byM[k] || 0) + e.amount; } });
+    const ks = Object.keys(byM); if (!ks.length) return null;
+    const amts = ks.map((k) => byM[k]).sort((a, b) => a - b);
+    return { months: [...new Set(ks.map((k) => +k.slice(5)))].sort((a, b) => a - b), amount: Math.round(amts[Math.floor(amts.length / 2)]) };
+  }, []);
+
+  const [kind, setKind] = useState(meta.kind || "auto");
+  const s0 = meta.sched || {};
+  const [months, setMonths] = useState(s0.months || []);
+  const [amount, setAmount] = useState(s0.amount ? String(s0.amount) : "");
+  const [mode, setMode] = useState(s0.mode || "due");
+  const p0 = meta.pay || {};
+  const [freq, setFreq] = useState(p0.freq || "");
+  const [anchor, setAnchor] = useState(p0.anchor || (detected && detected.anchor) || "");
+  const [day, setDay] = useState(p0.day || (detected && detected.day) || 1);
+  const [payAmt, setPayAmt] = useState(p0.amount ? String(p0.amount) : "");
+  const [since, setSince] = useState((type === "Income" ? p0.since : s0.since) || first);
+  const [err, setErr] = useState("");
+  const num = (v) => { const n = parseFloat(String(v).replace(/[^0-9.]/g, "")); return n > 0 ? Math.round(n * 100) / 100 : 0; };
+  const eff = kind === "auto" ? (auto[cat] || "flex") : kind;
+  const pay = freq ? { freq, anchor: freq === "biweekly" ? anchor : undefined, day: freq === "monthly" ? +day : undefined, amount: num(payAmt), since } : null;
+  const sched = eff === "nonmonthly" ? { months, amount: num(amount), mode, since } : null;
+
+  const save = () => {
+    setErr("");
+    if (type === "Income") {
+      if (pay && pay.freq === "biweekly" && !/^\d{4}-\d{2}-\d{2}$/.test(pay.anchor || "")) return setErr("Pick the date of a recent payday.");
+      if (pay && !pay.amount) return setErr("Enter the amount of one paycheck.");
+      const next = { ...meta }; if (pay) next.pay = pay; else delete next.pay;
+      setCatMeta(type, cat, Object.keys(next).length ? next : null);
+      return onDone(pay ? `${cat}: paydays set (${PAY_LABEL[pay.freq].toLowerCase()}, ${fmt2(pay.amount)} each), starting ${monthLabel(since)}.` : `${cat}: paydays removed. It uses a regular monthly amount again.`);
+    }
+    if (eff === "nonmonthly" && (!months.length || !num(amount))) return setErr("Pick the month(s) it's due and the amount each time.");
+    const next = { ...meta };
+    if (kind === "auto") delete next.kind; else next.kind = kind;
+    if (eff === "nonmonthly") next.sched = sched; else delete next.sched;
+    setCatMeta(type, cat, Object.keys(next).length ? next : null);
+    onDone(eff === "nonmonthly" ? `${cat}: non-monthly, ${schedText(sched)}, starting ${monthLabel(since)}.` : `${cat} is now listed under ${eff === "fixed" ? "Bills" : "Everyday"}.`);
+  };
+
+  const preview = (type === "Income" && pay && (pay.freq !== "biweekly" || /^\d{4}-\d{2}-\d{2}$/.test(pay.anchor || "")))
+    ? [0, 1, 2, 3, 4, 5].map((n) => addMonths(since, n)).map((k) => ({ k, days: PlanKit.paydays(pay, k, shift) })) : null;
+  const nextThree = preview && pay.freq === "biweekly" ? Array.from({ length: 24 }, (_, n) => addMonths(since, n)).find((k) => PlanKit.paydays(pay, k, shift).length > 2) : null;
+
+  return (
+    <Sheet title={cat} sub={type === "Income" ? "When does this money arrive?" : "What kind of cost is this?"} onClose={onClose}
+      foot={<div className="ap-imp-footbtns"><button className="ap-imp-secondary" onClick={onClose}>Cancel</button><button className="ap-imp-primary" onClick={save}>Save</button></div>}>
+      {err && <div className="ap-imp-warn" style={{ marginBottom: 12 }}>{err}</div>}
+      {type === "Expenses" && (<>
+        <div className="ap-choice" role="radiogroup" aria-label="Kind">
+          {[["auto", `Let the app decide (${KIND_LABEL[auto[cat] || "flex"]})`], ["fixed", "Bill"], ["flex", "Everyday"], ["nonmonthly", "Non-monthly"]].map(([k, l]) => (
+            <button key={k} className={kind === k ? "on" : ""} onClick={() => setKind(k)} role="radio" aria-checked={kind === k}>{l}</button>))}
+        </div>
+        <p className="ap-imp-fine">Bills are about the same every month (mortgage, phone, subscriptions). Everyday costs change (groceries, restaurants). Non-monthly costs come a few times a year.</p>
+        {eff === "nonmonthly" && (
+          <div className="ap-cs-block">
+            {history && <button className="ap-imp-secondary" style={{ marginBottom: 10 }} onClick={() => { setMonths(history.months); setAmount(String(history.amount)); }}>
+              Use last 12 months: {monthsText(history.months)} · about {fmt(history.amount)}</button>}
+            <div className="ap-cs-label">Due in</div>
+            <div className="ap-monthchips">
+              {MLABEL.map((l, i) => { const m = i + 1, on = months.includes(m); return (
+                <button key={l} className={on ? "on" : ""} aria-pressed={on} onClick={() => setMonths(on ? months.filter((x) => x !== m) : [...months, m].sort((a, b) => a - b))}>{l}</button>); })}
+            </div>
+            <div className="ap-cs-row">
+              <span className="ap-cs-label">Amount each time</span>
+              <div className="ap-amtwrap"><span className="cur">$</span><input type="text" inputMode="decimal" onFocus={selectAll} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Amount each time" /></div>
+            </div>
+            <div className="ap-cs-label">How to budget it</div>
+            <label className="ap-cs-radio"><input type="radio" checked={mode === "due"} onChange={() => setMode("due")} /> In the months it's due{num(amount) && months.length ? ` (${fmt(num(amount))} in ${monthsText(months)})` : ""}</label>
+            <label className="ap-cs-radio"><input type="radio" checked={mode === "spread"} onChange={() => setMode("spread")} /> Set a little aside every month{num(amount) && months.length ? ` (${fmt2(PlanKit.schedAmount({ months, amount: num(amount), mode: "spread" }, first))}/mo)` : ""}</label>
+            {mode === "spread" && <p className="ap-imp-fine">The Dashboard shows how much has been set aside since the last time it was due.</p>}
+            <div className="ap-cs-row"><span className="ap-cs-label">Starting</span>
+              <select value={since} onChange={(e) => setSince(e.target.value)}>{startOpts.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}</select></div>
+            <p className="ap-imp-fine">Months before that keep the budget they have.</p>
+          </div>
+        )}
+      </>)}
+      {type === "Income" && (<>
+        {detected && !meta.pay && (
+          <div className="ap-cs-detect">
+            From your deposits: <b>{PAY_LABEL[detected.freq].toLowerCase()}</b>{detected.anchor ? `, last on ${shortDay(detected.anchor)}` : ""}, about <b>{fmt2(detected.amount)}</b> ({detected.count} deposits).
+            <button className="ap-linkbtn" onClick={() => { setFreq(detected.freq); if (detected.anchor) setAnchor(detected.anchor); if (detected.day) setDay(detected.day); setPayAmt(String(detected.amount)); }}>Use this</button>
+          </div>
+        )}
+        <div className="ap-choice" role="radiogroup" aria-label="Paydays">
+          {[["", "No schedule"], ["biweekly", "Every 2 weeks"], ["semimonthly", "Twice a month"], ["monthly", "Once a month"]].map(([k, l]) => (
+            <button key={k || "none"} className={freq === k ? "on" : ""} onClick={() => setFreq(k)} role="radio" aria-checked={freq === k}>{l}</button>))}
+        </div>
+        {!freq && <p className="ap-imp-fine">Without a schedule, this category uses the monthly amount you type, like any other.</p>}
+        {freq && (
+          <div className="ap-cs-block">
+            {freq === "biweekly" && <div className="ap-cs-row"><span className="ap-cs-label">A recent payday</span><input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} /></div>}
+            {freq === "semimonthly" && <p className="ap-imp-fine">Paid on the 15th and the last day of the month.</p>}
+            {freq === "monthly" && <div className="ap-cs-row"><span className="ap-cs-label">Day of the month</span>
+              <select value={day} onChange={(e) => setDay(+e.target.value)}>{Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d === 31 ? "Last day" : d}</option>)}</select></div>}
+            {freq !== "biweekly" && <p className="ap-imp-fine">A payday on a Saturday or Sunday is counted on the Friday before.</p>}
+            <div className="ap-cs-row"><span className="ap-cs-label">Each paycheck</span>
+              <div className="ap-amtwrap"><span className="cur">$</span><input type="text" inputMode="decimal" onFocus={selectAll} value={payAmt} onChange={(e) => setPayAmt(e.target.value)} aria-label="Each paycheck" /></div></div>
+            <div className="ap-cs-row"><span className="ap-cs-label">Starting</span>
+              <select value={since} onChange={(e) => setSince(e.target.value)}>{startOpts.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}</select></div>
+            <p className="ap-imp-fine">{shift ? `Paychecks in the last ${shift === 1 ? "day" : shift + " days"} of a month count toward the next month (setting below the Income list).` : "Every paycheck counts toward the month it arrives in."} Months before the start keep their budget.</p>
+            {preview && (
+              <div className="ap-cs-preview">
+                {preview.map(({ k, days }) => (
+                  <div key={k} className={days.length > 2 ? "three" : ""}><span>{monthLabel(k)}</span>
+                    <span>{days.length} payday{days.length === 1 ? "" : "s"}{days.length ? ` · ${days.map(shortDay).join(", ")}` : ""}</span>
+                    <b className="mono">{fmt(days.length * num(payAmt))}</b></div>))}
+                {nextThree && <div className="three"><span>{monthLabel(nextThree)}</span><span>Next month with 3 paychecks. It's planned automatically.</span><b className="mono">{fmt(3 * num(payAmt))}</b></div>}
+              </div>
+            )}
+          </div>
+        )}
+      </>)}
+    </Sheet>
+  );
+}
+
 function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBucketForEntry, openImport }) {
   const [q, setQ] = useState("");
   const [ftype, setFtype] = useState("All");
@@ -2117,31 +3018,31 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
                   {TYPES.map((t)=>(<option key={t}>{t}</option>))}</select></td>
                 <td><select value={x.category} onChange={(e)=>editEntry(x.id,{category:e.target.value})}>
                   {[...new Set([...allCats(x.type), x.category])].map((c)=>(<option key={c}>{c}</option>))}</select></td>
-                <td><input type="text" value={x.note||x.name||""} onChange={(e)=>editEntry(x.id,{note:e.target.value})}/>
+                <td><input type="text" placeholder="Note (optional)" aria-label="Note" value={x.note||x.name||""} onChange={(e)=>editEntry(x.id,{note:e.target.value})}/>
                   {x.type==="Income" && x.date && (
                     <select className="ap-countsel" value={x.budgetMonth||"auto"} onChange={(e)=>editEntry(x.id,{budgetMonth: e.target.value==="auto"?undefined:e.target.value})} aria-label="Budget month">
                       <option value="auto">Counts toward: automatic</option>
                       <option value="same">Counts toward {monthLabel(x.date.slice(0,7))}</option>
                       <option value="next">Counts toward {monthLabel(addMonths(x.date.slice(0,7),1))}</option>
                     </select>)}</td>
-                <td><select value={x.bucket||""} onChange={(e)=>setBucketForEntry(x.id, e.target.value||undefined)}>
-                  <option value="">—</option>
+                <td><select value={x.bucket||""} aria-label="Bucket" onChange={(e)=>setBucketForEntry(x.id, e.target.value||undefined)}>
+                  <option value="">No bucket</option>
                   {buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}</select></td>
-                <td className="r"><input className="amt" type="number" value={x.amount} onChange={(e)=>editEntry(x.id,{amount:Math.round((parseFloat(e.target.value)||0)*100)/100})}/></td>
+                <td className="r"><MoneyInput className="amt" value={x.amount} commit="blur" keepIfEmpty ariaLabel="Amount" onValue={(v)=>{ if (v > 0) editEntry(x.id,{amount:v}); }}/></td>
                 <td><button className="ap-rowbtn done" onClick={()=>setEditId(null)}>Done</button></td>
               </tr>
             ) : (
               <tr key={x.id}>
-                <td className="mono nowrap">{x.date}</td>
+                <td className="mono nowrap" title={x.date}>{niceDate(x.date)}</td>
                 <td><span className={"chip chip-"+x.type.toLowerCase()}>{x.type}</span></td>
                 <td className="cat">{x.category}</td>
-                <td className="det">{x.note||x.name||<span className="dim">—</span>}{x.importId && <span className="ap-srcpdf" title={x.src && x.src.photo ? "Read from a photo" : "Imported from a bank statement"}>{x.src && x.src.photo ? "PHOTO" : "PDF"}</span>}{x.src && x.src.raw && <span className="ap-rawline" title={x.src.raw}>{x.src.raw}</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
-                <td>{x.bucket ? <span className="bchip">{x.bucket}</span> : <span className="dim">—</span>}</td>
+                <td className={"det" + (x.note||x.name||x.importId||(x.src&&x.src.raw) ? "" : " none")}>{x.note||x.name||""}{x.importId && <span className="ap-srcpdf" title={x.src && x.src.photo ? "Read from a photo" : "Imported from a bank statement"}>{x.src && x.src.photo ? "PHOTO" : "PDF"}</span>}{x.src && x.src.raw && <span className="ap-rawline" title={x.src.raw}>{x.src.raw}</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
+                <td className={x.bucket ? "" : "none"}>{x.bucket ? <span className="bchip">{x.bucket}</span> : ""}</td>
                 <td className="r mono" style={{color:x.type==="Income"?"var(--emerald)":x.type==="Savings"?"var(--teal)":"var(--ink)"}}>
                   {(x.type==="Income") !== (x.amount<0) ? "+" : "−"}{fmt2(Math.abs(x.amount))}</td>
                 <td className="rowacts">
                   <button className="ap-rowbtn" onClick={()=>setEditId(x.id)}>Edit</button>
-                  <button className="ap-rowbtn del" aria-label="Delete" onClick={()=>{ if (confirm(`Delete ${x.category} ${fmt2(Math.abs(x.amount))} on ${x.date}?\n\nIf you delete it by mistake, restore it from Backups at the bottom of the app.`)) deleteEntry(x.id); }}><span className="lbl">Delete</span><span className="x">×</span></button>
+                  <button className="ap-rowbtn del" aria-label="Delete" title="Delete (you can Undo)" onClick={()=>deleteEntry(x.id)}><span className="lbl">Delete</span><span className="x">×</span></button>
                 </td>
               </tr>
             ))}
@@ -2153,22 +3054,42 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
   );
 }
 
+const niceDate = (iso) => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); const t = new Date(y, m - 1, d);
+  return t.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + (y !== new Date().getFullYear() ? `, ${y}` : ""); };
+
 /* ================= YEAR ================= */
 const axisMoney = (v) => { const a = Math.abs(v), sign = v < 0 ? "-" : ""; return sign + "$" + (a >= 1000 ? (+(a / 1000).toFixed(1)) + "k" : Math.round(a)); };
+function useWidth(fallback) {
+  const ref = useRef(null);
+  const [w, setW] = useState(fallback);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const measure = () => setW(Math.max(280, Math.round(el.getBoundingClientRect().width)));
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(el); else window.addEventListener("resize", measure);
+    return () => { if (ro) ro.disconnect(); else window.removeEventListener("resize", measure); };
+  }, []);
+  return [ref, w];
+}
 function YearChart({ data }) {
-  const W = 720, H = 240, padL = 46, padR = 12, padT = 14, padB = 26;
+  const [box, W] = useWidth(720);
+  return <div ref={box} style={{ width: "100%" }}><YearChartSvg data={data} W={W} /></div>;
+}
+function YearChartSvg({ data, W }) {
+  const H = 240, padL = 46, padR = 12, padT = 14, padB = 26;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const top = Math.max(1, ...data.map((d) => Math.max(d.Income, d.Expenses, d.Net, d.partial ? (d.PlanInc || 0) : 0)));
   const bottom = Math.min(0, ...data.map((d) => d.Net));
   const range = (top - bottom) || 1;
   const y = (v) => padT + innerH * (1 - (v - bottom) / range);
   const groupW = innerW / data.length;
-  const barW = Math.min(12, groupW * 0.3);
+  const barW = Math.max(3, Math.min(14, groupW * 0.3));
   const grid = Array.from({ length: 5 }, (_, i) => bottom + range * i / 4);
   const zero = y(0);
   const pts = data.map((d, i) => [padL + groupW * (i + 0.5), y(d.Net)]);
   return (
-    <svg viewBox={"0 0 " + W + " " + H} width="100%" height="240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Income, expenses and net by month">
+    <svg viewBox={"0 0 " + W + " " + H} width={W} height={H} style={{ display: "block", maxWidth: "100%" }} role="img" aria-label="Income, expenses and net by month">
       {grid.map((gv, i) => (
         <g key={i}>
           <line x1={padL} x2={W - padR} y1={y(gv)} y2={y(gv)} stroke="var(--line)" strokeWidth="1" />
@@ -2184,7 +3105,7 @@ function YearChart({ data }) {
             )}
             <rect x={cx - barW - 1} y={Math.min(y(d.Income), zero)} width={barW} height={Math.abs(zero - y(d.Income))} fill="var(--emerald)" rx="2" />
             <rect x={cx + 1} y={Math.min(y(d.Expenses), zero)} width={barW} height={Math.abs(zero - y(d.Expenses))} fill="var(--clay)" rx="2" />
-            {(data.length <= 13 || i % Math.ceil(data.length / 12) === 0) && (
+            {(i % Math.max(1, Math.ceil(data.length / Math.floor(innerW / 34))) === 0) && (
               <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill={d.partial ? "#8A5A00" : "var(--ink-soft)"}>{d.name}{d.partial ? " ◐" : ""}</text>
             )}
           </g>
@@ -2360,10 +3281,12 @@ function Trends({ state, archives, period, currentYear, endYear, restoreYear }) 
         <h2 className="ap-mini-t" style={{ fontSize: 24, margin: "0 0 6px" }}>Spending trends</h2>
         <p className="ap-chartnote" style={{ margin: "0 0 12px" }}>Spending in <b>{period.label}</b>, compared with the same dates in other years.</p>
         <div className="ap-trend-opts">
-          <label>Compare categories:</label>
-          <select multiple value={selectedCats} onChange={(e) => { const opts = Array.from(e.target.selectedOptions, (o) => o.value); setSelectedCats(opts.length > 0 ? opts : ["Groceries"]); }} className="ap-multiselect">
-            {expenseCategories.map((c) => (<option key={c} value={c}>{c}</option>))}
-          </select>
+          <label>Compare categories (tap to add or remove):</label>
+          <div className="ap-chipset">
+            {expenseCategories.map((c) => { const on = selectedCats.includes(c); return (
+              <button key={c} className={on ? "on" : ""} aria-pressed={on}
+                onClick={() => { const next = on ? selectedCats.filter((x) => x !== c) : [...selectedCats, c]; setSelectedCats(next.length ? next : [c]); }}>{c}</button>); })}
+          </div>
         </div>
       </div>
 
@@ -2515,7 +3438,7 @@ function SplitRow({ cat, amount, pct, onSet }) {
           <input className="ap-splitrange" type="range" min="0" max="100" step="1" value={pct} onChange={(e)=>onSet(Number(e.target.value))}/>
           <div className="ap-customvals">
             <span><i style={{background:"var(--navy)"}}/>Mao <b className="mono">{fmt(maoAmt)}</b>
-              <input className="ap-pctin" type="number" min="0" max="100" value={pct} onChange={(e)=>onSet(Math.max(0,Math.min(100,Number(e.target.value)||0)))}/>%</span>
+              <MoneyInput className="ap-pctin" value={pct} max={100} commit="blur" keepIfEmpty ariaLabel="Mao's percent" onValue={(v)=>onSet(Math.round(v))}/>%</span>
             <span><i style={{background:"var(--teal)"}}/>Ingrid <b className="mono">{fmt(ingridAmt)}</b> ({100-pct}%)</span>
           </div>
         </div>
@@ -2534,7 +3457,7 @@ const fmtRange = (a, b) => `${shortDate(a)} – ${shortDate(b)}, ${b.slice(0, 4)
 const centsFmt = (c) => fmt2(Math.abs(c) / 100);
 const GROUP_ORDER = ["needs-account", "needs-savings", "needs-amount", "needs-category", "duplicate", "ready", "skipped"];
 
-function ImportSheet({ state, userName, commitImport, undoImport, updateImporter, onClose }) {
+function ImportSheet({ state, userName, commitImport, undoImport, updateImporter, saveCat, onClose }) {
   const [view, setView] = useState("pick");          // pick | reading | error | review | done | history | rules
   const [errors, setErrors] = useState([]);
   const [stmt, setStmt] = useState(null);
@@ -2617,7 +3540,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
   /* ---- context the classifier sees: saved settings plus this session's answers ---- */
   const ctx = useMemo(() => {
     if (!stmt) return null;
-    const cats = (t) => [...(state.categories[t] || []), ...extraCats[t]];
+    const cats = (t) => [...new Set([...(state.categories[t] || []), ...extraCats[t]])];
     const self = stmt.photo ? null : { ...(imp.accounts[stmt.last4] || {}), ...(answers.accounts[stmt.last4] || {}), kind: stmt.kind, label: stmt.label, ours: true, statements: true };
     return {
       categories: { Income: cats("Income"), Expenses: cats("Expenses"), Savings: cats("Savings") },
@@ -2672,6 +3595,7 @@ function ImportSheet({ state, userName, commitImport, undoImport, updateImporter
     const name = (window.prompt(`New ${type === "Income" ? "income" : "expense"} category name`) || "").trim();
     if (!name) return null;
     if (!ctx.categories[type].includes(name)) setExtraCats((e) => ({ ...e, [type]: [...e[type], name] }));
+    if (saveCat) saveCat(type, name);   // saved now, even if this import is later canceled
     return name;
   };
 
@@ -2997,7 +3921,7 @@ function PhotoEdit({ c, editRow }) {
     <div className="ap-imp-photoedit">
       <input type="text" value={c.desc} onChange={(e) => editRow(c.id, { desc: e.target.value })} aria-label="Store or description" />
       <input type="date" value={c.date} onChange={(e) => e.target.value && editRow(c.id, { date: e.target.value })} aria-label="Date" />
-      <input type="text" inputMode="decimal" value={amt} placeholder="amount" className={c.needsAmount ? "missing" : ""} onChange={(e) => setAmt(e.target.value)} onBlur={(e) => commitAmt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} aria-label="Amount" />
+      <input type="text" inputMode="decimal" onFocus={selectAll} value={amt} placeholder="amount" className={c.needsAmount ? "missing" : ""} onChange={(e) => setAmt(e.target.value)} onBlur={(e) => commitAmt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} aria-label="Amount" />
       <button className="ap-imp-dir" onClick={() => editRow(c.id, { dir: c.dir === "out" ? "in" : "out" })} title="Switch between money out and money in">{c.dir === "out" ? "Money out ⇄" : "Money in ⇄"}</button>
     </div>
   );
@@ -3674,6 +4598,158 @@ function Styles() {
     .ap-mini-row{grid-template-columns:1fr 90px;grid-template-areas:"nm vl" "bar bar";}
     .ap-mini-row .nm{grid-area:nm;}.ap-mini-row .vl{grid-area:vl;}.ap-mini-row .ap-track{grid-area:bar;}
     .ap-count{margin-left:0;width:100%;}
+  }
+
+  /* planning v2 */
+  .ap-plan-actions button:not(.ghost){background:var(--navy);}
+  .ap-balance{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px;background:#E7F1EA;border:1px solid #BFD9C9;border-radius:11px;padding:9px 12px;margin:0 0 12px;}
+  .ap-balance.neg{background:#FBEAE8;border-color:#E4B9B3;}
+  .ap-balance select{font-family:'Archivo';font-size:13px;border:1.5px solid var(--line);border-radius:7px;padding:5px 6px;background:var(--paper2);max-width:220px;}
+  .ap-balance button{font-family:'Archivo';font-weight:700;font-size:13px;background:var(--ink);color:var(--paper2);border:none;border-radius:7px;padding:7px 12px;cursor:pointer;}
+  .ap-plangroup+.ap-plangroup{margin-top:10px;}
+  .ap-plangroup-head{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);padding:8px 0 2px;border-bottom:1px solid var(--line);}
+  .ap-plangroup-hint{font-size:12px;color:var(--ink-soft);margin:4px 0 2px;}
+  .ap-planrow-main{flex:1;min-width:0;}
+  .ap-planrow-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .ap-planrow-main .ap-planrow-name{flex:0 1 auto;min-width:0;overflow-wrap:break-word;}
+  .ap-planrow-sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;line-height:1.35;}
+  .ap-planrow.zero .ap-planrow-name{color:var(--ink-soft);}
+  .ap-kind{font-family:'Archivo';font-size:10.5px;font-weight:600;color:var(--navy);background:#EEF2F8;border:1px solid #CBD6E6;border-radius:20px;padding:1px 8px;cursor:pointer;white-space:nowrap;}
+  .ap-linkbtn{font-family:'Archivo';font-size:inherit;font-weight:600;color:var(--navy);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;}
+  .ap-psheet{display:flex;flex-direction:column;max-width:680px;}
+  .ap-psheet-foot{position:sticky;bottom:0;background:var(--paper2);border-top:1.5px solid var(--line);padding:12px 20px;border-radius:0 0 16px 16px;}
+  .ap-psheet .ap-imp-footbtns{display:flex;gap:10px;justify-content:flex-end;}
+  .ap-sf-sources{display:grid;gap:6px;margin-bottom:12px;}
+  .ap-sf-src{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;background:#fff;font-size:13.5px;}
+  .ap-sf-src.on{border-color:var(--navy);background:#EEF2F8;}
+  .ap-sf-src input{margin-top:3px;}
+  .ap-sf-src select{display:block;margin-top:6px;font-family:'Archivo';font-size:13px;border:1.5px solid var(--line);border-radius:7px;padding:5px 6px;background:var(--paper2);}
+  .ap-sf-sub{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:1px;font-weight:400;}
+  .ap-sf-sub .rm{color:var(--clay);font-weight:600;}
+  .ap-sf-keep{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:0 0 10px;}
+  .ap-sf-group{margin-bottom:14px;}
+  .ap-sf-group h3{display:flex;justify-content:space-between;font-family:'Archivo';font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 4px;border-bottom:1px solid var(--line);padding-bottom:4px;}
+  .ap-sf-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);}
+  .ap-sf-row.off .ap-sf-name b{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25);}
+  .ap-sf-row.off .ap-amtwrap{opacity:.5;}
+  .ap-sf-name{flex:1;min-width:0;display:flex;gap:9px;align-items:flex-start;font-size:13.5px;cursor:pointer;}
+  .ap-sf-name input{margin-top:3px;width:17px;height:17px;flex:none;}
+  .ap-sf-row .ap-amtwrap input{width:84px;}
+  .ap-sf-more{font-size:12.5px;margin:8px 0 2px;}
+  .ap-sf-tot{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-soft);margin-bottom:10px;}
+  .ap-sf-tot b{color:var(--ink);font-size:13px;}
+  .ap-sf-tot .ok b{color:var(--emerald);} .ap-sf-tot .neg b{color:var(--clay);}
+  .ap-choice{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .ap-choice button{font-family:'Archivo';font-size:13px;font-weight:600;border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:8px 12px;cursor:pointer;}
+  .ap-choice button.on{background:var(--navy);border-color:var(--navy);color:var(--paper2);}
+  .ap-cs-block{border-top:1.5px solid var(--line);margin-top:12px;padding-top:12px;}
+  .ap-cs-label{font-size:12px;font-weight:700;color:var(--ink-soft);margin:10px 0 6px;}
+  .ap-cs-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0;}
+  .ap-cs-row .ap-cs-label{margin:0;}
+  .ap-cs-row select,.ap-cs-row input[type=date]{font-family:'Archivo';font-size:14px;border:1.5px solid var(--line);border-radius:8px;padding:7px 8px;background:#fff;color:var(--ink);}
+  .ap-cs-radio{display:flex;gap:8px;align-items:center;font-size:13.5px;margin:6px 0;}
+  .ap-monthchips{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .ap-monthchips button{font-family:'Archivo';font-size:13px;font-weight:600;border:1.5px solid var(--line);background:#fff;border-radius:8px;padding:8px 0;cursor:pointer;color:var(--ink);}
+  .ap-monthchips button.on{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .ap-cs-detect{font-size:13px;background:#E7F1EA;border:1px solid #BFD9C9;border-radius:10px;padding:10px 12px;margin-bottom:12px;line-height:1.5;}
+  .ap-cs-detect .ap-linkbtn{margin-left:6px;}
+  .ap-cs-preview{border:1.5px solid var(--line);border-radius:10px;background:#fff;margin-top:10px;}
+  .ap-cs-preview>div{display:grid;grid-template-columns:78px 1fr auto;gap:8px;padding:7px 10px;font-size:12.5px;border-bottom:1px solid var(--line);}
+  .ap-cs-preview>div:last-child{border-bottom:none;}
+  .ap-cs-preview>div.three{background:#E7F1EA;}
+  .ap-envnote{font-size:11.5px;color:var(--teal);margin-top:6px;line-height:1.35;}
+  .ap-unbud{margin:4px 0 18px;}
+  .ap-unbud-body{background:var(--paper2);border:1.5px solid var(--line);border-radius:11px;padding:10px 12px;margin-top:-2px;}
+  .ap-unbud-body p{font-size:12.5px;color:var(--ink-soft);margin:0 0 8px;}
+  .ap-unbud-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .ap-unbud-chips span{font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:3px 10px;}
+  @media(max-width:600px){
+    .ap-plan-actions{width:100%;}
+    .ap-plan-actions button{flex:1;}
+    .ap-psheet-foot{border-radius:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));}
+    .ap-psheet .ap-imp-footbtns button{flex:1;}
+    .ap-balance select{max-width:100%;flex:1;}
+  }
+
+  /* undo */
+  .ap-undo{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:8000;display:flex;align-items:center;gap:6px;max-width:calc(100vw - 32px);
+    background:var(--ink);color:var(--paper2);border-radius:14px;padding:6px 6px 6px 14px;box-shadow:0 12px 30px -10px rgba(0,0,0,.45);}
+  .ap-undo-what{font-size:12.5px;min-width:0;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85;}
+  .ap-undo button{font-family:'Archivo';font-weight:700;font-size:14px;background:rgba(255,255,255,.12);color:var(--paper2);border:none;border-radius:9px;padding:9px 13px;cursor:pointer;flex:none;}
+  .ap-undo button:hover:not(:disabled){background:rgba(255,255,255,.22);}
+  .ap-undo button:disabled{opacity:.35;cursor:default;}
+  .ap-foot{padding-bottom:70px;}
+  @media(max-width:600px){ .ap-undo{left:16px;right:16px;} .ap-undo-what{flex:1;} }
+  @media(max-width:600px){ .ap-planrow{gap:6px;} .ap-planrow .ap-amtwrap input{width:62px;padding:8px 4px;} .ap-planrow .ap-del{padding:0 2px;} }
+
+  /* ===== phone & tablet pass ===== */
+  .ap-plan-danger{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 6px;font-size:12.5px;color:var(--ink-soft);}
+  .ap-plan-danger .ap-imp-secondary{color:var(--clay);}
+  .ap-periodlbl{flex:1;min-width:150px;font-family:'Archivo';font-weight:700;font-size:15px;color:var(--ink);background:none;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;text-align:center;}
+  .ap-periodlbl:hover{background:var(--paper);}
+  .ap-customdates{margin-top:6px;}
+  .ap-presets button.soft{background:var(--paper);color:var(--ink);border-color:var(--navy);}
+  .ap-signout{font-family:'Archivo';font-size:11px;font-weight:600;color:var(--navy);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin-left:6px;text-decoration:none;letter-spacing:0;text-transform:none;vertical-align:1px;}
+  .ap-tabs .ic{display:none;}
+  .ap-tabs .sh{display:none;}
+  .ap-envgroup{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-family:'Archivo';font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin:18px 0 8px;}
+  .ap-envgroup .mono{letter-spacing:0;text-transform:none;font-weight:600;}
+  .ap-billlist{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;padding:2px 14px;margin-bottom:14px;}
+  .ap-bill{background:none;border:none;border-bottom:1px solid var(--line);border-radius:0;padding:9px 0;box-shadow:none;}
+  .ap-bill:last-child{border-bottom:none;}
+  .ap-bill.over{background:none;}
+  .ap-bill-row{display:flex;align-items:center;gap:10px;}
+  .ap-bill-row .ap-env-name{flex:1;min-width:0;font-weight:600;font-size:14px;}
+  .ap-bill-st{font-family:'JetBrains Mono';font-size:12px;color:var(--ink-soft);white-space:nowrap;}
+  .ap-bill-st.paid{color:var(--emerald);font-weight:600;}
+  .ap-bill.over .ap-bill-st{color:var(--clay);}
+  .ap-chipset{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .ap-chipset button{font-family:'Archivo';font-size:13px;font-weight:600;border:1.5px solid var(--line);background:var(--paper2);color:var(--ink-soft);border-radius:20px;padding:6px 12px;cursor:pointer;}
+  .ap-chipset button.on{background:var(--navy);border-color:var(--navy);color:var(--paper2);}
+  .ap-txnscroll{max-height:none;overflow:visible;}
+  .ap-txntable td.none{color:transparent;}
+  /* touch screens: bigger targets, and 16px text in boxes so iPhone/iPad don't zoom in when you tap one */
+  @media (pointer:coarse){
+    input[type=text],input[type=email],input[type=password],input[type=date],input:not([type]),select,textarea{font-size:16px !important;}
+    .ap-envadd,.ap-rowbtn,.ap-presets button,.ap-iobtn{min-height:36px;}
+    .ap-kind{padding:4px 10px;}
+    .ap-del{min-width:36px;min-height:36px;}
+    .ap-arrow{width:40px;height:40px;}
+    .ap-avg{padding:4px 0;}
+  }
+  @media(max-width:600px){
+    .ap-root{padding-bottom:calc(74px + env(safe-area-inset-bottom));}
+    .ap-wrap{padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right));}
+    .ap-tabs{position:fixed;left:0;right:0;bottom:0;z-index:7000;margin:0;display:grid;grid-template-columns:repeat(6,1fr);gap:0;overflow:visible;
+      background:rgba(250,251,252,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line);border-bottom:none;
+      padding:4px 2px calc(4px + env(safe-area-inset-bottom));}
+    .ap-tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 4px;border:none;margin:0;font-size:10.5px;min-height:48px;color:var(--ink-soft);}
+    .ap-tabs button.on{color:var(--navy);}
+    .ap-tabs .ic{display:block;}
+    .ap-tabs .lg{display:none;}
+    .ap-tabs .sh{display:block;}
+    .ap-undo{bottom:calc(70px + env(safe-area-inset-bottom));}
+    .ap-head{align-items:stretch;}
+    .ap-periodbox{width:100%;align-items:stretch;}
+    .ap-statusline{justify-content:space-between;}
+    .ap-plan-bar{position:sticky;top:0;z-index:50;background:var(--paper);margin:0 -16px 8px;padding:8px 16px;border-bottom:1px solid var(--line);}
+    .ap-alloc{padding:6px 12px;}
+    .ap-alloc b{font-size:19px;}
+    .ap-txntable td.none{display:none;}
+    .ap-chipset button{padding:8px 12px;}
+    .ap-plan-bar{flex-wrap:nowrap;}
+    .ap-plan-actions{width:auto;flex:1;}
+    .ap-plan input{scroll-margin-top:90px;}
+    .ap-presets{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+    .ap-presets::-webkit-scrollbar{display:none;}
+    .ap-presets button{flex:none;padding:6px 9px;font-size:12.5px;}
+    .ap-filtbar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;}
+    .ap-filtbar>*{min-width:0;width:100%;margin:0;box-sizing:border-box;}
+    .ap-filtbar .ap-search{grid-column:1/-1;}
+    .ap-filtbar select{grid-column:span 2;}
+    .ap-filtbar .ap-iobtn{grid-column:span 3;}
+    .ap-filtbar .ap-iobtn.strong{grid-column:1/-1;}
+    .ap-filtbar .ap-count{grid-column:1/-1;}
   }
   `}</style>);
 }
