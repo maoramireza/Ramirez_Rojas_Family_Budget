@@ -427,7 +427,10 @@ window.addEventListener("error", function(e){
     return rows.sort((a, b) => a.cy - b.cy).map((r) => r.words.sort((a, b) => a.x - b.x).map((w) => w.text).join(" ")).join("\n");
   }
 
-  const MON3 = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12 };
+  const MON3 = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12,
+                 ene:1, abr:4, ago:8, dic:12 };                                   // Spanish (feb, mar, may, jun, jul, sep, oct, nov are shared)
+  const MONTH_WORD = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec|Ene|Abr|Ago|Dic)[a-z\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa]*\\.?";
+  const monthNum = (w) => { const k = String(w).toLowerCase(); return MON3[k.startsWith("sept") ? "sep" : k.slice(0, 3)]; };
   // OCR often reads "$" as "S"; amounts must end in two decimals.
   const MONEY_RX = /(?:^|\s)((?:[-+\u2212\u2013\u2014\u201c\u201d"'~]\s?)?[$S]?\s?\d{1,3}(?:,\d{3})*[.,]\d{2}|(?:[-+\u2212\u2013\u2014\u201c\u201d"'~]\s?)?[$S]?\s?\d+[.,]\d{2})(?=\s|$)/g;
   const SIGN = "[-+\\u2212\\u2013\\u2014\\u201c\\u201d\"'~]";
@@ -452,17 +455,17 @@ window.addEventListener("error", function(e){
     if ((m = line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/)) && validMD(+m[2], +m[3])) return { iso: iso(+m[1], +m[2], +m[3]), tok: m[0] };
     if ((m = line.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/)) && validMD(+m[1], +m[2])) { const y = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return { iso: iso(y, +m[1], +m[2]), tok: m[0] }; }
     if ((m = line.match(/\b(\d{1,2})\/(\d{1,2})\b/)) && validMD(+m[1], +m[2])) return { iso: inferYear(+m[1], +m[2], todayIso, 3), tok: m[0] };
-    if ((m = line.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?\b/i))) {
-      const mo = MON3[m[1].toLowerCase()], d = +m[2];
+    if ((m = line.match(new RegExp("\\b" + MONTH_WORD + "\\s*(\\d{1,2})\\b(?:\\s*,?\\s*(20\\d\\d))?", "i")))) {
+      const mo = monthNum(m[1]), d = +m[2];
       if (validMD(mo, d)) return { iso: m[3] ? iso(+m[3], mo, d) : inferYear(mo, d, todayIso, 3), tok: m[0] };
     }
     if (/\btoday\b|\bpending\b|\bprocessing\b/i.test(line)) return { iso: todayIso, tok: (line.match(/\btoday\b|\bpending\b|\bprocessing\b/i) || [""])[0] };
     if (/\byesterday\b/i.test(line)) return { iso: addDays(todayIso, -1), tok: line.match(/\byesterday\b/i)[0] };
     return null;
   }
-  const INFLOW_RX = /deposit|payroll|refund|\bcredit\b|zelle (payment )?from|transfer from|interest|cash ?back|received|reversal/i;
+  const INFLOW_RX = /\bdeposit(?!ar)|dep[oó]sito|reembolso|devoluci[oó]n|payroll|refund|\bcredit\b|zelle (payment )?from|transfer from|interest|cash ?back|received|reversal/i;
   const clean = (s) => s.replace(/[|_~•·;]+/g, " ").replace(/show more transactions?.*$/i, " ").replace(/eligible for a custom pay plan/ig, " ")
-    .replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\b.*?\b20\d\d\b.*$/i, " ")   // half-visible next row at the screen edge
+    .replace(new RegExp("\\s+" + MONTH_WORD + "\\s*\\d{1,2}\\b.*?\\b20\\d\\d\\b.*$", "i"), " ")   // half-visible next row at the screen edge
     .replace(/(?:\s+[a-z]{1,2})+$/, "")                                                            // stray lowercase letters at the end
     .replace(/\s+/g, " ")
     .replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, "").replace(/^[a-z]\s+|\s+[a-z]$/g, "").replace(/^(?:CCD|PPD|WEB)\s+|\s+(?:CCD|PPD|WEB)$/g, "").trim();
@@ -493,26 +496,42 @@ window.addEventListener("error", function(e){
     });
     return rows;
   }
-  const BLOCK_HEAD = /^(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})|Processing|Pending)\b\s*/i;
+  // "Sep 8, 2026" · "sept 28, 2026" · "sept 28,2026" · "28 sept 2026" · "28 de sept. de 2026" · Pending / Pendiente / Processing / Procesando
+  const HEAD_MDY = new RegExp("^" + MONTH_WORD + "\\s*(\\d{1,2})\\b\\s*,?\\s*(20\\d\\d)\\b\\s*", "i");
+  const HEAD_DMY = new RegExp("^(\\d{1,2})\\s*(?:de\\s+)?" + MONTH_WORD + "\\s*(?:de\\s+)?,?\\s*(20\\d\\d)\\b\\s*", "i");
+  const HEAD_PENDING = /^(?:Processing|Pending|Pendiente|Procesando|En proceso)\b\s*/i;
+  function parseHead(line, todayIso) {
+    let m;
+    if ((m = line.match(HEAD_MDY)) && validMD(monthNum(m[1]), +m[2])) return { date: iso(+m[3], monthNum(m[1]), +m[2]), rest: line.slice(m[0].length) };
+    if ((m = line.match(HEAD_DMY)) && validMD(monthNum(m[2]), +m[1])) return { date: iso(+m[3], monthNum(m[2]), +m[1]), rest: line.slice(m[0].length) };
+    if ((m = line.match(HEAD_PENDING))) return { date: todayIso, rest: line.slice(m[0].length) };
+    return null;
+  }
+  // the app's own menus and notes, in English and Spanish: never part of a transaction
+  const CHROME_LINE = /Pay\s*&\s*Transfer|Deposit Checks|Pagar y Transferir|Depositar cheques|Show more transactions|Mostrar m[aá]s transacciones|Search transactions|Buscar transacciones|Available balance|Saldo disponible|Current balance|Saldo actual|Now viewing|All Transactions|Todas las transacciones|C[oó]mo podemos ayudar|Ofrecido por/i;
   // Credit card screens flip the signs: purchases show with no sign (they add to what you owe), payments/refunds show "-".
-  const CARD_RX = /credit card|statement balance|minimum payment|available credit|visa|mastercard|amex|american express|customized cash|travel rewards|premium rewards|unlimited cash|cash rewards/i;
-  const DEBIT_RX = /available balance|checking|savings|debit|tarjeta d[eé]bito/i;
+  const CARD_RX = /tarjeta de cr[eé]dito|saldo del estado de cuenta|pago m[ií]nimo|cr[eé]dito disponible|credit card|statement balance|minimum payment|available credit|visa|mastercard|amex|american express|customized cash|travel rewards|premium rewards|unlimited cash|cash rewards/i;
+  const DEBIT_RX = /available balance|checking|savings|debit|tarjeta d[eé]bito|saldo disponible|cuenta de cheques|ahorros/i;
   const detectAcctType = (text) => (CARD_RX.test(text) && !DEBIT_RX.test(text) ? "card" : "debit");
-  const CARD_IN_RX = /payment|thank you|refund|return|credit|cash ?back|reversal/i;
-  const isBlockLayout = (text) => text.split(/\n/).filter((l) => BLOCK_HEAD.test(l.trim())).length >= 2;
+  const CARD_IN_RX = /payment|thank you|refund|return|credit|cash ?back|reversal|\bpago\b|reembolso|devoluci[oó]n|cr[eé]dito|abono/i;
+  const isBlockLayout = (text) => text.split(/\n/).filter((l) => parseHead(l.trim(), "2000-01-01")).length >= 2;
   function parsePhotoBlocks(text, pi, todayIso, card) {
     const blocks = [];
     text.split(/\n/).map((t) => t.trim()).filter(Boolean).forEach((line) => {
-      const h = line.match(BLOCK_HEAD);
-      if (h) {
-        const date = h[1] ? iso(+h[3], MON3[h[1].toLowerCase()], +h[2]) : todayIso;
-        blocks.push({ date, parts: [line.slice(h[0].length)] });
-      } else if (blocks.length) blocks[blocks.length - 1].parts.push(line);
+      if (CHROME_LINE.test(line)) {                   // menus, search boxes, balance headers
+        // a menu below the list ends it; drop the icon row just above it (symbols, no real words)
+        const last = blocks[blocks.length - 1];
+        while (last && last.parts.length > 1 && !/[A-Za-z]{3,}/.test(last.parts[last.parts.length - 1]) && !moneyTokens(last.parts[last.parts.length - 1]).length) last.parts.pop();
+        return;
+      }
+      const h = parseHead(line, todayIso);
+      if (h) blocks.push({ date: h.date, parts: [h.rest] });
+      else if (blocks.length) blocks[blocks.length - 1].parts.push(line);
       // anything above the first date line (headers, "Available balance") is ignored
     });
     const rows = [];
     blocks.forEach((b) => {
-      const text2 = b.parts.join(" ").replace(/amount may change.*?merchant/i, " ");
+      const text2 = b.parts.join(" ").replace(/amount may change.*?merchant/i, " ").replace(/el (?:monto|importe) puede cambiar.*?comercio/i, " ");
       const all = moneyTokens(text2);
       const money = all.filter((m) => m.dollar);     // bank screens always print "$"; a bare number is a misread, not an amount
       // Each row shows the amount first and the running balance under it. OCR sometimes drops the sign
@@ -591,10 +610,13 @@ window.addEventListener("error", function(e){
     texts.forEach((t, i) => {
       if ((types && types[i] && types[i] !== "auto") || acct[i] !== "debit" || used[i] === "receipt" || !isBlockLayout(t)) return;
       if (DEBIT_RX.test(t)) return;                                  // the screen says it's a bank account
-      const asDebit = parsePhotoBlocks(t, i, todayIso, false).filter((r) => !r.needsAmount);
-      const looksIn = asDebit.filter((r) => r.amount > 0 && !INFLOW_RX.test(r.desc)).length;
-      const out = asDebit.filter((r) => r.amount < 0).length;
-      if (looksIn >= 3 && looksIn > out * 2) acct[i] = "card";
+      // Only rows whose direction was actually read (a sign, or the balances) count; payments and credits don't,
+      // since both kinds of screen show those with a "-".
+      const asDebit = parsePhotoBlocks(t, i, todayIso, false).filter((r) => !r.needsAmount && (r.signKnown || r.signFixed));
+      const notPurchase = (r) => INFLOW_RX.test(r.desc) || CARD_IN_RX.test(r.desc) || /\bpmts?\b/i.test(r.desc);
+      const purchasesIn = asDebit.filter((r) => r.amount > 0 && !notPurchase(r)).length;
+      const purchasesOut = asDebit.filter((r) => r.amount < 0 && !notPurchase(r)).length;
+      if (purchasesIn >= 3 && purchasesIn > purchasesOut * 2) acct[i] = "card";
     });
     let rows = texts.flatMap((t, i) => used[i] === "receipt" ? parsePhotoReceipt(t, i, todayIso)
       : isBlockLayout(t) ? parsePhotoBlocks(t, i, todayIso, acct[i] === "card") : parsePhotoList(t, i, todayIso, acct[i] === "card"));
@@ -804,7 +826,8 @@ window.addEventListener("error", function(e){
     const d = c.desc;
 
     if (RX.ktc.test(d)) return setSkip(c, "Keep the Change round-up");
-    if (c.photoCard && isIn && /\bpayment\b|thank you/i.test(d) && !RX.refund.test(d)) return setSkip(c, "Card payment");
+    if (c.photoCard && isIn && /\bpayment\b|thank you|\bpago\b/i.test(d) && !RX.refund.test(d)) return setSkip(c, "Card payment");
+    if (c.photoCard && isIn) { c.kind = "refund"; return; }       // any other credit on a card is a refund/credit, same as on card statements
     if (RX.cashback.test(d)) return setSkip(c, "Cash back (kept off)");
     if (isIn && RX.interestEarned.test(d)) return setSkip(c, "Interest (kept off)");
     if (A === "card" && c.section === "credits" && /^PAYMENT\b/i.test(d) && !counterpartyOf(d)) return setSkip(c, "Card payment");
@@ -989,7 +1012,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-29 (photos v5, cards auto)";
+const APP_VERSION = "2026-09-29 (photos v6, español)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
