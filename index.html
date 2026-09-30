@@ -1282,7 +1282,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-30 (dots)";
+const APP_VERSION = "2026-09-30 (compact tabs)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -1618,6 +1618,10 @@ function App({ session, onSignOut }) {
     s.importer = imp;
   }, "undid an import");
   const setSetting = (k, v) => update((s) => { s.settings = { ...(s.settings || {}), [k]: v }; });
+  const setMonthClosed = (key, closed) => update((s) => {
+    const list = (s.closedMonths || []).filter((k) => k !== key);
+    s.closedMonths = closed ? [...list, key].sort() : list;
+  }, `${closed ? "marked" : "reopened"} ${monthLabel(key)}${closed ? " as finished" : ""}`);
   /* ---- backups: full copies stored as extra rows beside the live budget; live sync only watches id "family" ---- */
   const myName = NAMES[(session?.user?.email||"").toLowerCase()] || session?.user?.email || "someone";
   const writeBackup = async (st, id, label) => {
@@ -1773,7 +1777,7 @@ function App({ session, onSignOut }) {
         </nav>
 
         {tab==="dashboard" && (
-          <Dashboard state={state} period={period} addEntry={addEntry} deleteEntry={deleteEntry} goPlan={()=>setTab("planning")}/>
+          <Dashboard state={state} period={period} addEntry={addEntry} deleteEntry={deleteEntry} goPlan={()=>setTab("planning")} setMonthClosed={setMonthClosed}/>
         )}
         {tab==="planning" && (
           <Planning state={state} period={period} setSetting={setSetting}
@@ -1782,7 +1786,7 @@ function App({ session, onSignOut }) {
             addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket}/>
         )}
         {tab==="year" && (
-          <Year state={state} period={period} goMonth={(key)=>{ openMonth(key); setTab("dashboard"); }}/>
+          <Year state={state} period={period} goMonth={(key)=>{ openMonth(key); setTab("dashboard"); }} setMonthClosed={setMonthClosed}/>
         )}
         {tab==="transactions" && (
           <Transactions state={state} period={period} editEntry={editEntry} deleteEntry={deleteEntry} importTxns={importTxns} setBucketForEntry={setBucketForEntry} openImport={()=>setImportOpen(true)}/>
@@ -1891,7 +1895,10 @@ const countsMonth = (e, state) => (countsDate(e, state) || "").slice(0, 7);
 /* ================= DATA COMPLETENESS =================
    Once an account's statements are being imported, a month is complete only when that account's statements
    cover every day of it (up to today). Months before an account's first statement aren't judged. */
+// A month either of you marked as finished (every statement you have is in) counts as complete.
+const isClosed = (state, key) => (state.closedMonths || []).includes(key);
 function statementGaps(state, key) {
+  if (isClosed(state, key)) return [];
   const imp = state.importer;
   if (!imp || !imp.imports || !imp.imports.length) return [];
   const today = localToday();
@@ -2074,7 +2081,7 @@ function PeriodBar({ range, setRange, state }) {
 }
 
 /* ================= DASHBOARD ================= */
-function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
+function Dashboard({ state, period, addEntry, deleteEntry, goPlan, setMonthClosed }) {
   const dIdx = useMemo(() => actualsIndex(state), [state.entries, state.settings, state.importer]);
   const dAuto = useMemo(() => autoKinds(state, period.months[0], dIdx), [dIdx, state.categories, period.months[0]]);
   const [q, setQ] = useState("");
@@ -2197,7 +2204,14 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan }) {
       {monthGaps.length > 0 && (
         <div className="ap-partialnote">
           <b>{period.label} isn't complete yet.</b> Not imported: {monthGaps.slice(0, 3).map((g) => gapLabel(state, g)).join("; ")}{monthGaps.length > 3 ? `; and ${monthGaps.length - 3} more` : ""}.
+          {n === 1 && setMonthClosed && <div className="ap-closebar">
+            <span>Uploaded every statement you have for {MLABEL[+period.months[0].slice(5) - 1]}?</span>
+            <button className="ap-imp-secondary" onClick={() => setMonthClosed(period.months[0], true)}>Mark {MLABEL[+period.months[0].slice(5) - 1]} as finished</button></div>}
         </div>
+      )}
+      {n === 1 && isClosed(state, period.months[0]) && setMonthClosed && (
+        <div className="ap-closednote"><span>✓ {period.label} is marked as finished.</span>
+          <button className="ap-linkbtn" onClick={() => setMonthClosed(period.months[0], false)}>Reopen</button></div>
       )}
 
       <div className="ap-dashbar">
@@ -2548,62 +2562,96 @@ function Planning({ state, period, setSetting, setPlanAmt, clearOverride, setCat
       onAmount: (v) => setPlanAmt(type, c, months, v), onRename: (n) => renameCat(type, c, n), onRemove: () => removeCat(type, c),
     };
   };
-  const expGroups = [["fixed", "Bills", "Same every month. They repeat on their own."], ["flex", "Everyday", "Changes month to month. Last month and the 3-month average are next to each one."], ["nonmonthly", "Non-monthly", "Due a few times a year: insurance, fees, seasons."]]
-    .map(([k, title, hint]) => { const cats = state.categories.Expenses.filter((c) => kindOf(state, c, auto) === k); return { key: k, title, hint, cats, total: total("Expenses", cats) }; });
+  const inGroup = (k) => state.categories.Expenses.filter((c) => kindOf(state, c, auto) === k);
+  // "Needs a budget": spent last month or this month with nothing planned. Taken once per month shown, so a row
+  // doesn't jump away while you type its amount.
+  const needsRef = useRef({ key: null, list: [] });
+  if (needsRef.current.key !== first) {
+    needsRef.current = { key: first, list: state.categories.Expenses.map((c) => ({ c, spent: Math.max(idx.get("Expenses", c, prevKey), idx.get("Expenses", c, first)) }))
+      .filter((r) => r.spent > 0 && !(planFor(state, "Expenses", r.c, first) > 0)).sort((a, b) => b.spent - a.spent) };
+  }
+  const needs = needsRef.current.list;
+  const [open, setOpen] = useState({});
+  const tog = (k) => setOpen((o) => ({ ...o, [k]: !o[k] }));
+  const [newCat, setNewCat] = useState("");
+  const [newType, setNewType] = useState("Expenses");
+  const addNew = () => { const n = newCat.trim(); if (!n) return; addCat(newType, n); setNewCat("");
+    if (newType === "Expenses") setOpen((o) => ({ ...o, flex: true })); else setOpen((o) => ({ ...o, [newType]: true })); };
+  const GROUPS = [
+    ["Income", "Income", "inc", state.categories.Income, "Income"],
+    ["fixed", "Bills", "bill", inGroup("fixed"), "Expenses"],
+    ["flex", "Everyday", "flex", inGroup("flex"), "Expenses"],
+    ["nonmonthly", "Non-monthly", "nm", inGroup("nonmonthly"), "Expenses"],
+    ["Savings", "Savings", "sav", state.categories.Savings, "Savings"],
+  ];
+  const mlabel = MLABEL[+first.slice(5) - 1];
 
   return (
     <section className="ap-plan">
-      <div className="ap-plan-bar">
-        <div className={"ap-alloc" + (Math.round(toAllocate) === 0 ? " ok" : toAllocate < 0 ? " neg" : "")}>
-          <span>{single ? "To allocate" : `To allocate, ${months.length} months`}</span><b>{fmt(toAllocate)}</b>
+      <section className="ap-hero ap-planhero">
+        <div className="ap-planhero-top">
+          <div>
+            <div className="ap-hero-lbl">{single ? `To allocate in ${mlabel}` : `To allocate, ${months.length} months`}</div>
+            <div className={"ap-hero-val" + (Math.round(toAllocate) === 0 ? " ok" : toAllocate < 0 ? " neg" : "")}>{fmt(toAllocate)}</div>
+          </div>
+          <button className="ap-logbtn" onClick={() => setSheet({ mode: "start" })}>Plan {single ? mlabel : "these months"} from…</button>
         </div>
-        <div className="ap-plan-actions">
-          <button onClick={() => setSheet({ mode: "start" })}>Plan {single ? MLABEL[+first.slice(5) - 1] : "these months"} from…</button>
-        </div>
-      </div>
-      {single && Math.round(toAllocate) !== 0 && target && (
-        <div className={"ap-balance" + (toAllocate < 0 ? " neg" : "")}>
-          <span>{toAllocate > 0 ? <><b>{fmt2(toAllocate)}</b> isn't assigned yet. Put it in</> : <>Over by <b>{fmt2(-toAllocate)}</b>. Take it from</>}</span>
-          <select value={JSON.stringify(target)} onChange={(e) => setBalTo(e.target.value)} aria-label="Category">
-            <optgroup label="Savings">{state.categories.Savings.map((c) => <option key={c} value={JSON.stringify(["Savings", c])}>{c}</option>)}</optgroup>
-            <optgroup label="Expenses">{state.categories.Expenses.map((c) => <option key={c} value={JSON.stringify(["Expenses", c])}>{c}{toAllocate < 0 ? ` (${fmt(planFor(state, "Expenses", c, first))})` : ""}</option>)}</optgroup>
-          </select>
-          <button onClick={balance}>{toAllocate > 0 ? "Add it" : "Take it"}</button>
-        </div>
-      )}
-      {!single && Math.round(toAllocate) !== 0 && <p className="ap-plan-hint">To balance the leftover in one tap, pick a single month.</p>}
+        <div className="ap-plantot"><span>Income <b>{fmt(total("Income"))}</b></span><span>Spend <b>{fmt(total("Expenses"))}</b></span><span>Save <b>{fmt(total("Savings"))}</b></span></div>
+        {single && Math.round(toAllocate) !== 0 && target && (
+          <div className={"ap-balance" + (toAllocate < 0 ? " neg" : "")}>
+            <span>{toAllocate > 0 ? <>Put the {fmt2(toAllocate)} in</> : <>Take the {fmt2(-toAllocate)} from</>}</span>
+            <select value={JSON.stringify(target)} onChange={(e) => setBalTo(e.target.value)} aria-label="Category">
+              <optgroup label="Savings">{state.categories.Savings.map((c) => <option key={c} value={JSON.stringify(["Savings", c])}>{c}</option>)}</optgroup>
+              <optgroup label="Expenses">{state.categories.Expenses.map((c) => <option key={c} value={JSON.stringify(["Expenses", c])}>{c}{toAllocate < 0 ? ` (${fmt(planFor(state, "Expenses", c, first))})` : ""}</option>)}</optgroup>
+            </select>
+            <button onClick={balance}>{toAllocate > 0 ? "Add it" : "Take it"}</button>
+          </div>
+        )}
+        {inherited && <div className="ap-hero-notes">{mlabel} is repeating {monthLabel(src)}'s budget. Change any amount and it gets its own.</div>}
+        {!single && <div className="ap-hero-notes">An amount you type applies to each of these {months.length} months only.</div>}
+      </section>
       {msg && <div className={"ap-planmsg" + (msg.ok ? "" : " err")}>{msg.text}</div>}
 
-      <p className="ap-plan-hint">
-        {single
-          ? <>Editing the budget for <b>{monthLabel(first)}</b>. Amounts repeat into later months until you change them.</>
-          : <>Editing <b>{period.label}</b>. An amount you type applies to each of these {months.length} months only; {monthLabel(addMonths(last, 1))} keeps its own budget. Rows marked "varies" differ between these months.</>}
-        {" "}Aim to bring "To allocate" to $0.
-      </p>
-      {inherited && <p className="ap-inherit-note">{monthLabel(first)} doesn't have its own budget yet, so it's repeating <b>{monthLabel(src)}</b>. Change any amount and {MLABEL[+first.slice(5) - 1]} gets its own budget; later months follow it.</p>}
+      <div className="ap-dcard">
+        {needs.length > 0 && <>
+          <FoldRow dot="none" label="Needs a budget" value={`${needs.length} · spent ${fmt(needs.reduce((a, r) => a + r.spent, 0))}`} open={!!open.needs} onToggle={() => tog("needs")} />
+          {open.needs && <div className="ap-planrows">
+            <p className="ap-dhint">Spent in {MLABEL[+prevKey.slice(5) - 1]} or {mlabel} with nothing planned. Give each one a budget, or tap “use” to budget what was spent.</p>
+            {needs.map((r) => <PlanRow key={"n-" + r.c} {...rowProps("Expenses", r.c)} suggest={{ label: `use ${fmt(r.spent)}`, v: Math.round(r.spent) }} />)}
+          </div>}
+        </>}
+        {GROUPS.map(([k, label, dot, cats, type]) => (
+          <React.Fragment key={k}>
+            <FoldRow dot={dot} label={label} value={`${cats.length} · ${fmt(total(type, cats))}`} open={!!open[k]} onToggle={() => tog(k)} />
+            {open[k] && <div className="ap-planrows">
+              {cats.map((c) => <PlanRow key={c} {...rowProps(type, c)} />)}
+              {cats.length === 0 && <p className="ap-dhint">{k === "nonmonthly" ? "Costs due a few times a year, like insurance. Open a category and set it to Non-monthly." : "None yet."}</p>}
+              {k === "Income" && <label className="ap-paysetting ap-dhint">
+                Paychecks in the last
+                <select value={incomeShiftDays(state)} onChange={(e) => setSetting("incomeShiftDays", +e.target.value)} aria-label="Days before month-end">
+                  {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? "0 days (off)" : n === 1 ? "1 day" : n + " days"}</option>)}
+                </select>
+                of a month count toward the next month.
+              </label>}
+            </div>}
+          </React.Fragment>
+        ))}
+        <div className="ap-addcat ap-addrow">
+          <select value={newType} onChange={(e) => setNewType(e.target.value)} aria-label="New category type">
+            <option value="Expenses">Expense</option><option value="Income">Income</option><option value="Savings">Savings</option></select>
+          <input type="text" placeholder={"+ add " + (newType === "Expenses" ? "expense" : newType === "Income" ? "income" : "savings") + " category"} value={newCat}
+            onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addNew(); }} />
+          <button onClick={addNew}>Add</button>
+        </div>
+      </div>
 
-      <PlanSection type="Income" total={total("Income")} actualLabel={MLABEL[+prevKey.slice(5) - 1]} perMonthLabel={single ? "Budget" : "Per month"}
-        groups={[{ key: "all", cats: state.categories.Income }]} rowProps={(c) => rowProps("Income", c)} addCat={(n) => addCat("Income", n)}
-        footer={<label className="ap-paysetting">
-          Paychecks in the last
-          <select value={incomeShiftDays(state)} onChange={(e) => setSetting("incomeShiftDays", +e.target.value)} aria-label="Days before month-end">
-            {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? "0 days (off)" : n === 1 ? "1 day" : n + " days"}</option>)}
-          </select>
-          of a month count toward the next month.
-        </label>} />
-      <PlanSection type="Expenses" total={total("Expenses")} actualLabel={MLABEL[+prevKey.slice(5) - 1]} perMonthLabel={single ? "Budget" : "Per month"}
-        groups={expGroups} rowProps={(c) => rowProps("Expenses", c)} addCat={(n) => addCat("Expenses", n)}
-        footer={<p className="ap-plan-hint" style={{ margin: "10px 0 0" }}>“(auto)” means the app guessed from the last 3 months. Tap the label to change it.</p>} />
-      <PlanSection type="Savings" total={total("Savings")} actualLabel={MLABEL[+prevKey.slice(5) - 1]} perMonthLabel={single ? "Budget" : "Per month"}
-        groups={[{ key: "all", cats: state.categories.Savings }]} rowProps={(c) => rowProps("Savings", c)} addCat={(n) => addCat("Savings", n)} />
-
-      <button className="ap-imp-toggle" onClick={() => setShowBuckets(!showBuckets)} aria-expanded={showBuckets}>
-        <span>Buckets <span className="n">{Object.keys(state.buckets || {}).length}</span></span><span className="chev">{showBuckets ? "Hide" : "Show"}</span>
-      </button>
-      {showBuckets && <BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket} />}
+      <div className="ap-dcard">
+        <FoldRow dot="idle" label="Buckets" value={`${Object.keys(state.buckets || {}).length}`} open={showBuckets} onToggle={() => setShowBuckets(!showBuckets)} />
+        {showBuckets && <div style={{ padding: "0 12px 4px" }}><BucketManager state={state} addBucket={addBucket} renameBucket={renameBucket} deleteBucket={deleteBucket} /></div>}
+      </div>
       <div className="ap-plan-danger">
         <button className="ap-imp-secondary" onClick={resetPlan}>Reset to original plan…</button>
-        <span>Puts categories and amounts back to the starting plan. Transactions are kept, and you can Undo.</span>
+        <span>Transactions are kept, and you can Undo.</span>
       </div>
 
       {sheet && sheet.mode === "start" && <StartFromSheet state={state} period={period} idx={idx} auto={auto} applyPlan={applyPlan}
@@ -2659,71 +2707,54 @@ function BucketName({ name, onRename }) {
   );
 }
 
-function PlanSection({ type, groups, total, rowProps, actualLabel, perMonthLabel, addCat, footer }) {
-  const [newCat, setNewCat] = useState("");
-  const tone = type === "Income" ? "emerald" : type === "Savings" ? "teal" : "clay";
-  const any = groups.some((g) => g.cats.length);
-  const add = () => { addCat(newCat); setNewCat(""); };
+// A folded group's header line: dot, name, count and total, Show/Hide.
+function FoldRow({ dot, label, value, open, onToggle }) {
   return (
-    <div className="ap-plansec">
-      <div className="ap-plansec-head">
-        <h3 style={{ color: `var(--${tone})` }}>{type}</h3>
-        <span className="mono total">{fmt(total)}</span>
-      </div>
-      {any && <div className="ap-planlegend"><span>{actualLabel} actual · avg</span><span>{perMonthLabel}</span></div>}
-      {groups.map((g) => (
-        <div key={g.key} className="ap-plangroup">
-          {g.title && <div className="ap-plangroup-head"><span>{g.title}</span><span className="mono">{fmt(g.total)}</span></div>}
-          {g.title && g.cats.length > 0 && <p className="ap-plangroup-hint">{g.hint}</p>}
-          <div className="ap-planrows">
-            {g.cats.map((c) => <PlanRow key={c} {...rowProps(c)} />)}
-            {g.title && g.cats.length === 0 && <p className="ap-plangroup-hint">None yet. {g.hint}</p>}
-          </div>
-        </div>
-      ))}
-      {!any && <p className="ap-empty">No categories yet.</p>}
-      <div className="ap-addcat">
-        <input type="text" placeholder={"+ add " + type.toLowerCase().replace(/s$/, "") + " category"} value={newCat}
-          onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
-        <button onClick={add}>Add</button>
-      </div>
-      {footer}
-    </div>
+    <button className="ap-dgroup" onClick={onToggle} aria-expanded={!!open}>
+      <i className={"ap-dot " + dot} aria-hidden="true" /><span className="nm">{label}</span><span className="amt">{value}</span>
+      <span className="chev" aria-hidden="true">{open ? "Hide" : "Show"}</span>
+    </button>
   );
 }
 
-function PlanRow({ name, amount, actual, avg, inherited, tag, sub, over, resetLabel, onTag, onReset, onAmount, onRename, onRemove }) {
-  const [editing, setEditing] = useState(false);
+// One category in Planning: name and its budget box. Tap the name for last month, the average, its kind, rename and remove.
+function PlanRow({ name, amount, actual, avg, inherited, tag, sub, over, resetLabel, onTag, onReset, onAmount, onRename, onRemove, suggest }) {
+  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(name);
   const [amtFocus, setAmtFocus] = useState(false);
   useEffect(() => setDraft(name), [name]);
   const varies = amount === null;
+  const rename = () => { if (draft.trim() && draft.trim() !== name) onRename(draft.trim()); };
   return (
-    <div className={"ap-planrow" + (amount === 0 && !amtFocus ? " zero" : "")}>
-      <div className="ap-planrow-main">
-        <div className="ap-planrow-top">
-          {editing ? (
-            <input className="ap-renamein" value={draft} autoFocus
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => { onRename(draft); setEditing(false); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { onRename(draft); setEditing(false); } if (e.key === "Escape") { setDraft(name); setEditing(false); } }} />
-          ) : (
-            <span className="ap-planrow-name" onClick={() => setEditing(true)} title="Click to rename">{name}</span>
-          )}
-          {tag && onTag && <button className="ap-kind" onClick={onTag}>{tag}</button>}
+    <div className={"ap-planrow" + (amount === 0 && !amtFocus ? " zero" : "") + (open ? " open" : "")}>
+      <div className="ap-planrow-line">
+        <button className="ap-planrow-main" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span className="ap-planrow-name">{name}</span>
+          {(sub || over || suggest) && <span className="ap-planrow-sub">{over ? "changed for this month" : sub || (suggest ? "no budget yet" : "")}</span>}
+        </button>
+        {suggest && !(amount > 0) && <button className="ap-avg ap-use" onClick={() => onAmount(suggest.v)}>{suggest.label}</button>}
+        <div className={"ap-amtwrap" + (inherited && !amtFocus ? " inherited" : "")}>
+          <span className="cur">$</span>
+          <span onFocus={() => setAmtFocus(true)} onBlur={() => setAmtFocus(false)} style={{ display: "contents" }}>
+            <MoneyInput value={varies ? null : amount} onValue={onAmount} placeholder={varies ? "varies" : "0"} ariaLabel={`Budget for ${name}`} /></span>
         </div>
-        {(sub || over) && <div className="ap-planrow-sub">{sub}{over && <> · <b>changed for this month</b> <button className="ap-linkbtn" onClick={onReset}>↺ {resetLabel}</button></>}</div>}
       </div>
-      <span className="ap-actual mono">
-        <span title="Actually spent or received last month">{actual ? fmt(actual) : "—"}</span>
-        {avg != null && avg !== amount && <button className="ap-avg" onClick={() => onAmount(avg)} title="Use the 3-month average as this budget">avg {fmt(avg)}</button>}
-      </span>
-      <div className={"ap-amtwrap" + (inherited && !amtFocus ? " inherited" : "")}>
-        <span className="cur">$</span>
-        <span onFocus={() => setAmtFocus(true)} onBlur={() => setAmtFocus(false)} style={{ display: "contents" }}>
-          <MoneyInput value={varies ? null : amount} onValue={onAmount} placeholder={varies ? "varies" : "0"} ariaLabel={`Budget for ${name}`} /></span>
-      </div>
-      <button className="ap-del" onClick={onRemove} title="Remove category">×</button>
+      {open && (
+        <div className="ap-planrow-more">
+          <div className="ap-planrow-facts">
+            <span>Last month <b>{actual ? fmt(actual) : "—"}</b></span>
+            {avg != null && <span>3-month average <b>{fmt(avg)}</b> {avg !== amount && <button className="ap-linkbtn" onClick={() => onAmount(avg)}>use it</button>}</span>}
+          </div>
+          {sub && <div className="ap-planrow-facts"><span>{sub}</span></div>}
+          {over && <div className="ap-planrow-facts"><span>Changed for this month.</span><button className="ap-linkbtn" onClick={onReset}>↺ {resetLabel}</button></div>}
+          <div className="ap-planrow-tools">
+            {tag && onTag && <button className="ap-kind" onClick={onTag}>{tag}</button>}
+            <input className="ap-renamein" value={draft} aria-label={`Rename ${name}`} onChange={(e) => setDraft(e.target.value)}
+              onBlur={rename} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setDraft(name); }} />
+            <button className="ap-del" onClick={onRemove} title="Remove category">Remove</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3071,73 +3102,91 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
     }});
   };
 
+  const [more, setMore] = useState(false);
+  const [limit, setLimit] = useState(150);
+  useEffect(() => setLimit(150), [q, ftype, fcat, fsrc, period.from, period.to]);
+  const sign = (x) => ((x.type === "Income") !== (x.amount < 0) ? 1 : -1);
+  const days = [];
+  list.slice(0, limit).forEach((x) => { const last = days[days.length - 1]; if (last && last.date === x.date) last.items.push(x); else days.push({ date: x.date, items: [x] }); });
+  const dayNet = (d) => d.items.reduce((a, x) => a + (x.type === "Savings" ? 0 : sign(x) * Math.abs(x.amount)), 0);
+  const money = (v) => (v < 0 ? "−" : "+") + fmt2(Math.abs(v));
+  const edit = editId ? state.entries.find((x) => x.id === editId) : null;
+  const filtersOn = fcat !== "All" || fsrc !== "all";
+
   return (
-    <section className="ap-card">
-      <div className="ap-filtbar">
-        <input className="ap-search" type="text" placeholder="Search category or note…" value={q} onChange={(e)=>setQ(e.target.value)}/>
-        <select value={ftype} onChange={(e)=>{ setFtype(e.target.value); setFcat("All"); }}>
-          {["All",...TYPES].map((t)=>(<option key={t}>{t}</option>))}
-        </select>
-        <select value={fcat} onChange={(e)=>setFcat(e.target.value)}>
-          <option value="All">All categories</option>
-          {catOptions.map((c)=>(<option key={c} value={c}>{c}</option>))}
-        </select>
-        <select value={fsrc} onChange={(e)=>setFsrc(e.target.value)} aria-label="Source">
-          <option value="all">All sources</option>
-          <option value="typed">Typed by hand</option>
-          <option value="imported">From statements</option>
-          {acctIds.map((id)=>(<option key={id} value={id}>{SI.acctLabel(id, accounts[id]?.kind, accounts[id])}</option>))}
-        </select>
-        <button className="ap-iobtn strong" onClick={openImport}>Import statement</button>
-        <button className="ap-iobtn" onClick={exportCsv}>Export CSV</button>
-        <button className="ap-iobtn" onClick={()=>fileRef.current?.click()}>Import CSV</button>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={onFile}/>
-        <div className="ap-count">{list.length} records in {period.label} · net <b style={{color:net>=0?"var(--emerald)":"var(--clay)"}}>{fmt(net)}</b></div>
+    <section className="ap-track2">
+      <div className="ap-tbar">
+        <input className="ap-search" type="text" placeholder="Search category or note…" value={q} onChange={(e)=>setQ(e.target.value)} aria-label="Search transactions"/>
+        <button className="ap-iobtn strong" onClick={openImport}>Import</button>
+        <button className={"ap-iobtn" + (more || filtersOn ? " on" : "")} onClick={() => setMore(!more)} aria-expanded={more} aria-label="More filters and tools">⋯</button>
       </div>
+      <div className="ap-pills" role="radiogroup" aria-label="Type">
+        {["All", ...TYPES].map((t) => <button key={t} className={ftype === t ? "on" : ""} role="radio" aria-checked={ftype === t} onClick={() => { setFtype(t); setFcat("All"); }}>{t}</button>)}
+      </div>
+      {more && (
+        <div className="ap-tmore">
+          <select value={fcat} onChange={(e)=>setFcat(e.target.value)} aria-label="Category">
+            <option value="All">All categories</option>
+            {catOptions.map((c)=>(<option key={c} value={c}>{c}</option>))}
+          </select>
+          <select value={fsrc} onChange={(e)=>setFsrc(e.target.value)} aria-label="Source">
+            <option value="all">All sources</option>
+            <option value="typed">Typed by hand</option>
+            <option value="imported">From statements</option>
+            {acctIds.map((id)=>(<option key={id} value={id}>{SI.acctLabel(id, accounts[id]?.kind, accounts[id])}</option>))}
+          </select>
+          <button className="ap-iobtn" onClick={exportCsv}>Export CSV</button>
+          <button className="ap-iobtn" onClick={()=>fileRef.current?.click()}>Import CSV</button>
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={onFile}/>
       {msg && <div className="ap-importmsg">{msg}</div>}
-      <div className="ap-txnscroll">
-        <table className="ap-txntable">
-          <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Note</th><th>Bucket</th><th className="r">Amount</th><th></th></tr></thead>
-          <tbody>
-            {list.map((x)=> editId===x.id ? (
-              <tr key={x.id} className="editing">
-                <td><input type="date" value={x.date} onChange={(e)=>editEntry(x.id,{date:e.target.value})}/></td>
-                <td><select value={x.type} onChange={(e)=>{const t=e.target.value; editEntry(x.id,{type:t, category: allCats(t).includes(x.category)?x.category:(allCats(t)[0]||x.category)});}}>
-                  {TYPES.map((t)=>(<option key={t}>{t}</option>))}</select></td>
-                <td><select value={x.category} onChange={(e)=>editEntry(x.id,{category:e.target.value})}>
-                  {[...new Set([...allCats(x.type), x.category])].map((c)=>(<option key={c}>{c}</option>))}</select></td>
-                <td><input type="text" placeholder="Note (optional)" aria-label="Note" value={x.note||x.name||""} onChange={(e)=>editEntry(x.id,{note:e.target.value})}/>
-                  {x.type==="Income" && x.date && (
-                    <select className="ap-countsel" value={x.budgetMonth||"auto"} onChange={(e)=>editEntry(x.id,{budgetMonth: e.target.value==="auto"?undefined:e.target.value})} aria-label="Budget month">
-                      <option value="auto">Counts toward: automatic</option>
-                      <option value="same">Counts toward {monthLabel(x.date.slice(0,7))}</option>
-                      <option value="next">Counts toward {monthLabel(addMonths(x.date.slice(0,7),1))}</option>
-                    </select>)}</td>
-                <td><select value={x.bucket||""} aria-label="Bucket" onChange={(e)=>setBucketForEntry(x.id, e.target.value||undefined)}>
-                  <option value="">No bucket</option>
-                  {buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}</select></td>
-                <td className="r"><MoneyInput className="amt" value={x.amount} commit="blur" keepIfEmpty ariaLabel="Amount" onValue={(v)=>{ if (v > 0) editEntry(x.id,{amount:v}); }}/></td>
-                <td><button className="ap-rowbtn done" onClick={()=>setEditId(null)}>Done</button></td>
-              </tr>
-            ) : (
-              <tr key={x.id}>
-                <td className="mono nowrap" title={x.date}>{niceDate(x.date)}</td>
-                <td><span className={"chip chip-"+x.type.toLowerCase()}>{x.type}</span></td>
-                <td className="cat">{x.category}</td>
-                <td className={"det" + (x.note||x.name||x.importId||(x.src&&x.src.raw) ? "" : " none")}>{x.note||x.name||""}{x.importId && <span className="ap-srcpdf" title={x.src && x.src.photo ? "Read from a photo" : "Imported from a bank statement"}>{x.src && x.src.photo ? "PHOTO" : "PDF"}</span>}{x.src && x.src.raw && <span className="ap-rawline" title={x.src.raw}>{x.src.raw}</span>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin" title="Counts toward this month's budget">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</td>
-                <td className={x.bucket ? "" : "none"}>{x.bucket ? <span className="bchip">{x.bucket}</span> : ""}</td>
-                <td className="r mono" style={{color:x.type==="Income"?"var(--emerald)":x.type==="Savings"?"var(--teal)":"var(--ink)"}}>
-                  {(x.type==="Income") !== (x.amount<0) ? "+" : "−"}{fmt2(Math.abs(x.amount))}</td>
-                <td className="rowacts">
-                  <button className="ap-rowbtn" onClick={()=>setEditId(x.id)}>Edit</button>
-                  <button className="ap-rowbtn del" aria-label="Delete" title="Delete (you can Undo)" onClick={()=>deleteEntry(x.id)}><span className="lbl">Delete</span><span className="x">×</span></button>
-                </td>
-              </tr>
+
+      <div className="ap-dcard ap-tlist">
+        {days.map((d) => { const dn = dayNet(d); return (
+          <React.Fragment key={d.date}>
+            <div className="ap-tday"><span>{niceDate(d.date)}</span><span>{Math.round(dn * 100) ? money(dn) : ""}</span></div>
+            {d.items.map((x) => (
+              <button key={x.id} className="ap-trow" onClick={() => setEditId(x.id)}>
+                <span className="nm">
+                  <span className="t">{x.category}{x.bucket && <em className="ap-cnt" style={{ marginLeft: 6 }}>{x.bucket}</em>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</span>
+                  {(x.note || x.name || (x.src && x.src.raw)) && <span className="sub">{x.note || x.name || x.src.raw}</span>}
+                </span>
+                <span className={"amt " + x.type.toLowerCase()}>{x.type === "Savings" ? fmt2(Math.abs(x.amount)) : money(sign(x) * Math.abs(x.amount))}</span>
+              </button>
             ))}
-            {list.length===0 && <tr><td colSpan={7} className="ap-empty">{state.entries.length ? `No transactions in ${period.label} match these filters. Try All time in the date filter at the top.` : "No transactions yet — log some from the Dashboard."}</td></tr>}
-          </tbody>
-        </table>
+          </React.Fragment>); })}
+        {list.length > limit && <button className="ap-dgroup" onClick={() => setLimit(limit + 300)}><span className="nm">Show more</span><span className="amt">{list.length - limit} more</span></button>}
+        {list.length===0 && <p className="ap-empty">{state.entries.length ? `No transactions in ${period.label} match. Try All time at the top.` : "No transactions yet. Log one from Home."}</p>}
       </div>
+      {list.length > 0 && <div className="ap-tfoot">{list.length} transaction{list.length === 1 ? "" : "s"} in {period.label} · net <b style={{color:net>=0?"var(--emerald)":"var(--clay)"}}>{fmt(net)}</b></div>}
+
+      {edit && (
+        <Sheet title="Edit transaction" label="Edit transaction" onClose={() => setEditId(null)}
+          foot={<div className="ap-imp-footbtns">
+            <button className="ap-imp-secondary ap-tdel" onClick={() => { deleteEntry(edit.id); setEditId(null); }}>Delete</button>
+            <button className="ap-imp-primary ap-tdone" onClick={() => setEditId(null)}>Done</button></div>}>
+          <div className="ap-tedit">
+            <label>Amount<div className="ap-amtwrap"><span className="cur">$</span>
+              <MoneyInput className="amt" value={Math.abs(edit.amount)} commit="blur" keepIfEmpty ariaLabel="Amount" onValue={(v)=>{ if (v > 0) editEntry(edit.id,{amount:v}); }}/></div></label>
+            <label>Date<input type="date" value={edit.date} onChange={(e)=>e.target.value && editEntry(edit.id,{date:e.target.value})}/></label>
+            <label>Type<select value={edit.type} onChange={(e)=>{const t=e.target.value; editEntry(edit.id,{type:t, category: allCats(t).includes(edit.category)?edit.category:(allCats(t)[0]||edit.category)});}}>
+              {TYPES.map((t)=>(<option key={t}>{t}</option>))}</select></label>
+            <label>Category<select value={edit.category} onChange={(e)=>editEntry(edit.id,{category:e.target.value})}>
+              {[...new Set([...allCats(edit.type), edit.category])].map((c)=>(<option key={c}>{c}</option>))}</select></label>
+            <label className="wide">Note<input type="text" placeholder="Note (optional)" value={edit.note||edit.name||""} onChange={(e)=>editEntry(edit.id,{note:e.target.value})}/></label>
+            {buckets.length > 0 && <label>Bucket<select value={edit.bucket||""} onChange={(e)=>setBucketForEntry(edit.id, e.target.value||undefined)}>
+              <option value="">No bucket</option>{buckets.map((b)=>(<option key={b} value={b}>{b}</option>))}</select></label>}
+            {edit.type==="Income" && edit.date && <label className="wide">Counts toward
+              <select value={edit.budgetMonth||"auto"} onChange={(e)=>editEntry(edit.id,{budgetMonth: e.target.value==="auto"?undefined:e.target.value})}>
+                <option value="auto">Automatic</option>
+                <option value="same">{monthLabel(edit.date.slice(0,7))}</option>
+                <option value="next">{monthLabel(addMonths(edit.date.slice(0,7),1))}</option>
+              </select></label>}
+            {edit.src && edit.src.raw && <p className="ap-imp-fine wide">From {edit.src.photo ? "a photo" : "a statement"}: <span className="mono">{edit.src.raw}</span></p>}
+          </div>
+        </Sheet>
+      )}
     </section>
   );
 }
@@ -3146,7 +3195,6 @@ const niceDate = (iso) => { if (!iso) return ""; const [y, m, d] = iso.split("-"
   return t.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + (y !== new Date().getFullYear() ? `, ${y}` : ""); };
 
 /* ================= YEAR ================= */
-const axisMoney = (v) => { const a = Math.abs(v), sign = v < 0 ? "-" : ""; return sign + "$" + (a >= 1000 ? (+(a / 1000).toFixed(1)) + "k" : Math.round(a)); };
 function useWidth(fallback) {
   const ref = useRef(null);
   const [w, setW] = useState(fallback);
@@ -3160,286 +3208,277 @@ function useWidth(fallback) {
   }, []);
   return [ref, w];
 }
-function YearChart({ data }) {
-  const [box, W] = useWidth(720);
-  return <div ref={box} style={{ width: "100%" }}><YearChartSvg data={data} W={W} /></div>;
+/* ================= CHARTS (drawn by hand: nothing extra to load) ================= */
+const C_BLUE = "#2a78d6", C_RED = "#e34948", C_GRAY = "#9b9a93", C_GRID = "#e1e0d9", C_BASE = "#c3c2b7";
+function niceTicks(min, max, count) {
+  const span = (max - min) || 1, raw = span / (count || 4), p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * p).find((x) => x >= raw);
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, t = [];
+  for (let v = lo; v <= hi + step / 2; v += step) t.push(Math.round(v * 100) / 100);
+  return { lo, hi: hi === lo ? lo + step : hi, t };
 }
-function YearChartSvg({ data, W }) {
-  const H = 240, padL = 46, padR = 12, padT = 14, padB = 26;
-  const innerW = W - padL - padR, innerH = H - padT - padB;
-  const top = Math.max(1, ...data.map((d) => Math.max(d.Income, d.Expenses, d.Net, d.partial ? (d.PlanInc || 0) : 0)));
-  const bottom = Math.min(0, ...data.map((d) => d.Net));
-  const range = (top - bottom) || 1;
-  const y = (v) => padT + innerH * (1 - (v - bottom) / range);
-  const groupW = innerW / data.length;
-  const barW = Math.max(3, Math.min(14, groupW * 0.3));
-  const grid = Array.from({ length: 5 }, (_, i) => bottom + range * i / 4);
-  const zero = y(0);
-  const pts = data.map((d, i) => [padL + groupW * (i + 0.5), y(d.Net)]);
+const tickMoney = (v) => (v < 0 ? "−" : "") + "$" + (Math.abs(v) >= 1000 ? (+(Math.abs(v) / 1000).toFixed(1)) + "k" : Math.round(Math.abs(v)));
+const signed = (v) => (v < 0 ? "−" : "+") + fmt(Math.abs(v));
+// Touch or hover a chart to read one month; the reading stays until you touch elsewhere.
+function useChartPick(n, padL, gw) {
+  const [act, setAct] = useState(null);
+  // The touch area starts where the plot starts, so position within it maps straight to a month.
+  const pick = (e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.floor((e.clientX - r.left) / gw); setAct(i >= 0 && i < n ? i : null); };
+  const leave = (e) => { if (e.pointerType === "mouse") setAct(null); };
+  return [act, { onPointerMove: pick, onPointerDown: pick, onPointerLeave: leave }];
+}
+function ChartTip({ children }) {
+  return <div className="ap-ctip" aria-live="polite">{children}</div>;
+}
+
+// By month: what was left over each month. Up and blue = came out ahead, down and red = spent more than came in,
+// dashed outline = the month isn't finished (or its statements aren't all imported), so it isn't final.
+function NetChart({ rows }) {
+  const [box, W] = useWidth(700);
+  const H = 190, padL = 46, padR = 8, padT = 12, padB = 24;
+  const iw = W - padL - padR, ih = H - padT - padB, gw = iw / Math.max(1, rows.length);
+  const [act, handlers] = useChartPick(rows.length, padL, gw);
+  const vals = rows.map((r) => (r.has ? r.net : 0));
+  const { lo, hi, t } = niceTicks(Math.min(0, ...vals), Math.max(1, ...vals), 3);
+  const y = (v) => padT + ih * (1 - (v - lo) / (hi - lo));
+  const bw = Math.max(4, Math.min(22, gw * 0.56)), every = Math.max(1, Math.ceil(30 / gw));
+  const bar = (cx, v) => {
+    const y0 = y(0), y1 = y(v), x0 = cx - bw / 2, x1 = cx + bw / 2, r = Math.min(4, bw / 2, Math.abs(y1 - y0));
+    if (Math.abs(y1 - y0) < 0.5) return "";
+    return v >= 0 ? `M${x0},${y0}V${y1 + r}Q${x0},${y1} ${x0 + r},${y1}H${x1 - r}Q${x1},${y1} ${x1},${y1 + r}V${y0}Z`
+                  : `M${x0},${y0}V${y1 - r}Q${x0},${y1} ${x0 + r},${y1}H${x1 - r}Q${x1},${y1} ${x1},${y1 - r}V${y0}Z`;
+  };
+  const r = act != null ? rows[act] : null;
   return (
-    <svg viewBox={"0 0 " + W + " " + H} width={W} height={H} style={{ display: "block", maxWidth: "100%" }} role="img" aria-label="Income, expenses and net by month">
-      {grid.map((gv, i) => (
-        <g key={i}>
-          <line x1={padL} x2={W - padR} y1={y(gv)} y2={y(gv)} stroke="var(--line)" strokeWidth="1" />
-          <text x={padL - 7} y={y(gv) + 3} textAnchor="end" fontSize="9" fontFamily="JetBrains Mono" fill="var(--ink-soft)">{axisMoney(gv)}</text>
-        </g>
-      ))}
-      {data.map((d, i) => {
-        const cx = padL + groupW * (i + 0.5);
-        return (
-          <g key={d.name}>
-            {d.partial && d.PlanInc > d.Income && (
-              <rect x={cx - barW - 1} y={y(d.PlanInc)} width={barW} height={Math.max(0, zero - y(d.PlanInc))} fill="none" stroke="var(--emerald)" strokeWidth="1.2" strokeDasharray="3 2" rx="2" />
-            )}
-            <rect x={cx - barW - 1} y={Math.min(y(d.Income), zero)} width={barW} height={Math.abs(zero - y(d.Income))} fill="var(--emerald)" rx="2" />
-            <rect x={cx + 1} y={Math.min(y(d.Expenses), zero)} width={barW} height={Math.abs(zero - y(d.Expenses))} fill="var(--clay)" rx="2" />
-            {(i % Math.max(1, Math.ceil(data.length / Math.floor(innerW / 34))) === 0) && (
-              <text x={cx} y={H - 9} textAnchor="middle" fontSize="10" fontFamily="Archivo" fill={d.partial ? "#8A5A00" : "var(--ink-soft)"}>{d.name}{d.partial ? " ◐" : ""}</text>
-            )}
-          </g>
-        );
-      })}
-      {pts.slice(1).map((p, i) => {
-        const dim = data[i].partial || data[i + 1].partial;
-        return <line key={"s" + i} x1={pts[i][0]} y1={pts[i][1]} x2={p[0]} y2={p[1]} stroke={dim ? "var(--ink-soft)" : "var(--navy)"} strokeWidth="2" strokeDasharray={dim ? "4 3" : undefined} opacity={dim ? 0.55 : 1} />;
-      })}
-      {pts.map((p, i) => (
-        <circle key={"c" + i} cx={p[0]} cy={p[1]} r="3.5" fill={data[i].partial ? "var(--paper2)" : "var(--navy)"} stroke={data[i].partial ? "var(--ink-soft)" : "var(--navy)"} strokeWidth="1.5" />
-      ))}
-    </svg>
+    <div ref={box} className="ap-chartbox">
+      <ChartTip>{r && r.has ? <><b>{monthLabel(r.key)}{r.unfinished ? " so far" : ""}</b><span>left over <b>{signed(r.net)}</b></span><span>in {fmt(r.inc)} · out {fmt(r.exp)}</span></>
+        : <span className="hint">Touch a month to see its numbers</span>}</ChartTip>
+      <svg width={W} height={H} style={{ display: "block", maxWidth: "100%", touchAction: "pan-y" }} role="img"
+        aria-label={"What was left over each month: " + rows.filter((x) => x.has).map((x) => `${x.label} ${signed(x.net)}`).join(", ")}>
+        {t.map((v) => <g key={v}>
+          <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke={v === 0 ? C_BASE : C_GRID} strokeWidth={v === 0 ? 1.5 : 1} />
+          <text x={padL - 7} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#898781" fontFamily="Archivo">{tickMoney(v)}</text></g>)}
+        {rows.map((x, i) => { const cx = padL + gw * (i + 0.5); const dim = act != null && act !== i; return (
+          <g key={x.key} opacity={dim ? 0.4 : 1}>
+            {x.has && <path d={bar(cx, x.net)} fill={x.unfinished ? "none" : x.net >= 0 ? C_BLUE : C_RED}
+              stroke={x.unfinished ? C_GRAY : "none"} strokeWidth="1.5" strokeDasharray={x.unfinished ? "3 3" : undefined} />}
+            {i % every === 0 && <text x={cx} y={H - 7} textAnchor="middle" fontSize="11" fill="#898781" fontFamily="Archivo">{x.label}</text>}
+          </g>); })}
+        <rect x={padL} y={0} width={iw} height={H} fill="transparent" {...handlers} />
+      </svg>
+
+    </div>
   );
 }
 
+// Trends: one category month by month. This year is the strong line; last year dashed gray; the budget a faint dotted line.
+function TrendChart({ labels, cur, prev, budget, curYear, prevYear }) {
+  const [box, W] = useWidth(700);
+  const H = 210, padL = 46, padR = 12, padT = 12, padB = 24;
+  const iw = W - padL - padR, ih = H - padT - padB, gw = iw / labels.length;
+  const [act, handlers] = useChartPick(labels.length, padL, gw);
+  const hasPrev = prev.some((v) => v > 0), hasBud = budget.some((v) => v > 0);
+  const all = [...cur.filter((v) => v != null), ...(hasPrev ? prev : []), ...(hasBud ? budget : [])];
+  const { lo, hi, t } = niceTicks(0, Math.max(1, ...all), 4);
+  const x = (i) => padL + gw * (i + 0.5), y = (v) => padT + ih * (1 - (v - lo) / (hi - lo));
+  const line = (arr) => { let d = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); pen = true; }); return d; };
+  const lastI = cur.reduce((a, v, i) => (v != null ? i : a), -1);
+  const firstI = cur.findIndex((v) => v != null);
+  const area = lastI >= 0 ? line(cur) + `L${x(lastI)},${y(0)}L${x(firstI)},${y(0)}Z` : "";
+  const every = Math.max(1, Math.ceil(30 / gw));
+  return (
+    <div ref={box} className="ap-chartbox">
+      {(() => { const i = act != null ? act : lastI; return i < 0 ? <ChartTip><span className="hint">Touch a month to see its numbers</span></ChartTip> : (
+        <ChartTip><b>{labels[i]}</b><span>{curYear} <b>{cur[i] == null ? "—" : fmt(cur[i])}</b></span>
+          {hasPrev && <span>{prevYear} {fmt(prev[i])}</span>}{hasBud && <span>budget {fmt(budget[i])}</span>}</ChartTip>); })()}
+      <svg width={W} height={H} style={{ display: "block", maxWidth: "100%", touchAction: "pan-y" }} role="img"
+        aria-label={`${curYear} by month: ` + cur.map((v, i) => (v == null ? null : `${labels[i]} ${fmt(v)}`)).filter(Boolean).join(", ")}>
+        {t.map((v) => <g key={v}>
+          <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke={v === 0 ? C_BASE : C_GRID} strokeWidth="1" />
+          <text x={padL - 7} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#898781" fontFamily="Archivo">{tickMoney(v)}</text></g>)}
+        {labels.map((l, i) => i % every === 0 && <text key={l} x={x(i)} y={H - 7} textAnchor="middle" fontSize="11" fill="#898781" fontFamily="Archivo">{l}</text>)}
+        {hasBud && <path d={line(budget)} fill="none" stroke={C_GRAY} strokeWidth="1" strokeDasharray="1 3" strokeLinecap="round" />}
+        {hasPrev && <path d={line(prev)} fill="none" stroke={C_GRAY} strokeWidth="1.5" strokeDasharray="5 4" strokeLinejoin="round" />}
+        {area && <path d={area} fill={C_BLUE} opacity="0.1" />}
+        <path d={line(cur)} fill="none" stroke={C_BLUE} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {lastI >= 0 && act == null && <circle cx={x(lastI)} cy={y(cur[lastI])} r="4.5" fill={C_BLUE} stroke="#fff" strokeWidth="2" />}
+        {act != null && <g>
+          <line x1={x(act)} x2={x(act)} y1={padT} y2={H - padB} stroke={C_BASE} strokeWidth="1" />
+          {hasPrev && <circle cx={x(act)} cy={y(prev[act])} r="3.5" fill={C_GRAY} stroke="#fff" strokeWidth="1.5" />}
+          {cur[act] != null && <circle cx={x(act)} cy={y(cur[act])} r="4.5" fill={C_BLUE} stroke="#fff" strokeWidth="2" />}
+        </g>}
+        <rect x={padL} y={0} width={iw} height={H} fill="transparent" {...handlers} />
+      </svg>
 
-function Year({ state, period, goMonth }) {
-  const ms = period.months;
+    </div>
+  );
+}
+
+function Year({ state, period, goMonth, setMonthClosed }) {
+  // One month picked at the top: show the year up to that month, so there's something to compare.
+  const single = period.months.length === 1;
+  const ms = single ? monthsBetween(period.months[0].slice(0, 4) + "-01", period.months[0]) : period.months;
+  const msKey = ms.join(",");
   const multiYear = ms[0].slice(0, 4) !== ms[ms.length - 1].slice(0, 4);
-  const inR = useMemo(() => state.entries.filter((e) => period.inRange(countsDate(e, state))), [state, period]);
+  const thisMonth = localToday().slice(0, 7);
+  const inR = useMemo(() => { const set = new Set(ms); return state.entries.filter((e) => e.date && set.has(countsMonth(e, state))); }, [state, msKey]);
   const rows = useMemo(() => ms.map((key) => {
     const ent = inR.filter((e) => countsMonth(e, state) === key);
     const sum = (t) => ent.filter((e) => e.type === t).reduce((a, e) => a + e.amount, 0);
     const inc = sum("Income"), exp = sum("Expenses"), sav = sum("Savings");
     const budget = state.categories.Expenses.reduce((a, c) => a + planFor(state, "Expenses", c, key), 0);
-    const planInc = state.categories.Income.reduce((a, c) => a + planFor(state, "Income", c, key), 0);
     const gaps = statementGaps(state, key);
-    return { key, label: MLABEL[+key.slice(5) - 1] + (multiYear ? " ’" + key.slice(2, 4) : ""), inc, exp, sav, budget, planInc, gaps, partial: gaps.length > 0, net: inc - exp, count: ent.length };
-  }), [state, period, inR]);
-
-  const tot = rows.reduce((a, r) => ({ inc: a.inc + r.inc, exp: a.exp + r.exp, sav: a.sav + r.sav, budget: a.budget + r.budget }), { inc: 0, exp: 0, sav: 0, budget: 0 });
-
-  const catMap = {};
-  inR.filter((e) => e.type === "Expenses").forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; });
-  const topCats = Object.entries(catMap).map(([c, v]) => ({ c, v })).sort((a, b) => b.v - a.v).slice(0, 10);
-  const maxCat = topCats[0]?.v || 1;
-
-  const bucketMap = {};
-  inR.filter((e) => e.type === "Expenses").forEach((e) => { const b = e.bucket || "Untagged"; bucketMap[b] = (bucketMap[b] || 0) + e.amount; });
-  const topBuckets = Object.entries(bucketMap).map(([c, v]) => ({ c, v })).sort((a, b) => b.v - a.v);
-  const maxBucket = topBuckets[0]?.v || 1;
-  const hasBucketSpend = topBuckets.some((b) => b.c !== "Untagged");
-
-  const chartData = rows.map((r) => ({ name: r.label, Income: Math.round(r.inc), Expenses: Math.round(r.exp), Net: Math.round(r.net), partial: r.partial, PlanInc: Math.round(r.planInc) }));
-  const partialRows = rows.filter((r) => r.partial);
-  const hasData = tot.inc > 0 || tot.exp > 0;
-
+    const cats = {}; ent.filter((e) => e.type === "Expenses").forEach((e) => { cats[e.category] = (cats[e.category] || 0) + e.amount; });
+    return { key, label: MLABEL[+key.slice(5) - 1] + (multiYear ? " ’" + key.slice(2, 4) : ""), inc, exp, sav, budget, gaps,
+      unfinished: gaps.length > 0 || (key >= thisMonth && !isClosed(state, key)), closed: isClosed(state, key), net: inc - exp, has: inc > 0 || exp > 0, count: ent.length,
+      top: Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 5) };
+  }), [state, msKey, inR]);
+  const tot = rows.reduce((a, r) => ({ inc: a.inc + r.inc, exp: a.exp + r.exp }), { inc: 0, exp: 0 });
+  const net = tot.inc - tot.exp;
+  const catMap = {}, bucketMap = {};
+  inR.filter((e) => e.type === "Expenses").forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; if (e.bucket) bucketMap[e.bucket] = (bucketMap[e.bucket] || 0) + e.amount; });
+  const topCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topBuckets = Object.entries(bucketMap).sort((a, b) => b[1] - a[1]);
+  const [open, setOpen] = useState({});
+  const tog = (k) => setOpen((o) => ({ ...o, [k]: !o[k] }));
+  const list = rows.filter((r) => r.has).slice().reverse();
+  const shown = open.older ? list : list.slice(0, 4);
+  const title = single ? `${ms[0].slice(0, 4)} through ${MLABEL[+ms[ms.length - 1].slice(5) - 1]}` : period.label;
+  const dotOf = (r) => (r.unfinished ? "dash" : r.net >= 0 ? "ahead" : "behind");
+  if (!list.length) return <section className="ap-hero"><div className="ap-hero-lbl">{title}</div><p className="ap-empty" style={{ margin: "8px 0 0" }}>No transactions logged yet.</p></section>;
   return (
     <>
-      <section className="ap-summary">
-        <Stat label="Income" val={tot.inc} color="var(--emerald)" />
-        <Stat label="Expenses" val={tot.exp} color="var(--clay)" />
-        <Stat label="Saved" val={tot.sav} color="var(--teal)" />
-        <Stat label="Net" val={tot.inc - tot.exp} color={(tot.inc - tot.exp) < 0 ? "var(--clay)" : "var(--ink)"} hero />
+      <section className="ap-hero">
+        <div className="ap-hero-lbl">{title} · {net >= 0 ? "came out ahead" : "spent more than came in"}</div>
+        <div className={"ap-hero-val" + (net < 0 ? " neg" : "")}>{signed(net)}</div>
+        <div className="ap-tiles">
+          <div><span>Money in</span><b>{fmt(tot.inc)}</b></div>
+          <div><span>Money out</span><b>{fmt(tot.exp)}</b></div>
+        </div>
+        <div className="ap-ckeys">
+          <span><i style={{ background: C_BLUE }} />Came out ahead</span>
+          <span><i style={{ background: C_RED }} />Spent more than came in</span>
+          {rows.some((r) => r.has && r.unfinished) && <span><i className="dash" />Not finished yet</span>}
+        </div>
+        <NetChart rows={rows} />
       </section>
 
-      <div className="ap-card" style={{ marginBottom: 16 }}>
-        <h3 className="ap-mini-t" style={{ marginBottom: 6 }}>Monthly flow · {period.label}</h3>
-        {hasData ? <YearChart data={chartData} /> : <p className="ap-empty">No transactions logged in {period.label}.</p>}
-        <div className="ap-legend"><span><i style={{ background: "var(--emerald)" }} />Income</span>
-          <span><i style={{ background: "var(--clay)" }} />Expenses</span><span><i style={{ background: "var(--navy)" }} />Net</span>
-          {partialRows.length > 0 && <span><i className="ap-dashkey" />Planned income, not imported yet</span>}</div>
-        <p className="ap-chartnote">The <b>Net</b> line is income minus expenses each month. Above $0 you came out ahead; below $0 you spent more than came in.</p>
+      <div className="ap-dcard">
+        {shown.map((r) => (
+          <div key={r.key} className={"ap-mrow" + (open["m" + r.key] ? " open" : "")}>
+            <button className="ap-drow-main" onClick={() => tog("m" + r.key)} aria-expanded={!!open["m" + r.key]}>
+              <i className={"ap-dot " + dotOf(r)} aria-hidden="true" />
+              <span className="mlbl">{r.label}</span>
+              <span className="nm ap-msub">In {fmt(r.inc)} · Out {fmt(r.exp)}</span>
+              <span className={"amt" + (r.net < 0 && !r.unfinished ? " neg" : "")}>{signed(r.net)}</span>
+            </button>
+            {open["m" + r.key] && (
+              <div className="ap-drow-more">
+                <div className="ap-drow-fact">{r.budget ? <>Spent {fmt(r.exp)} of {fmt(r.budget)} budgeted · {r.budget - r.exp >= 0 ? `${fmt(r.budget - r.exp)} under` : `${fmt(r.exp - r.budget)} over`}</> : <>Spent {fmt(r.exp)}, no budget set</>}</div>
+                {r.gaps.length > 0 && <div className="ap-drow-fact">Not imported yet: {r.gaps.map((g) => gapLabel(state, g)).join("; ")}</div>}
+                {r.top.length > 0 && <ul className="ap-mtop">{r.top.map(([c, v]) => <li key={c}><span>{c}</span><span>{fmt(v)}</span></li>)}</ul>}
+                <div className="ap-mrow-actions">
+                  <button className="ap-linkbtn" onClick={() => goMonth(r.key)}>Open {monthLabel(r.key)} on Home</button>
+                  {setMonthClosed && (r.closed
+                    ? <button className="ap-linkbtn" onClick={() => setMonthClosed(r.key, false)}>Reopen (marked finished)</button>
+                    : r.unfinished && <button className="ap-imp-secondary" onClick={() => setMonthClosed(r.key, true)}>Mark as finished</button>)}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {list.length > 4 && <FoldRow dot="idle" label={open.older ? "Show fewer" : `${list.length - 4} earlier month${list.length - 4 === 1 ? "" : "s"}`} value="" open={!!open.older} onToggle={() => tog("older")} />}
       </div>
 
-      <div className="ap-yeargrid">
-        <div className="ap-card">
-          <h3 className="ap-mini-t">By month</h3>
-          <table className="ap-yeartable">
-            <thead><tr><th>Month</th><th className="r">Budget</th><th className="r">Spent</th><th className="r">Δ</th><th className="r">Net</th></tr></thead>
-            <tbody>
-              {rows.map((r) => {
-                const d = r.budget - r.exp;
-                return (
-                  <tr key={r.key} onClick={() => goMonth(r.key)} title="Open this month">
-                    <td className="mlbl">{r.label}{r.count > 0 && <em className="ap-cnt">{r.count}</em>}{r.partial && <span className="ap-partial">partial</span>}</td>
-                    <td className="r mono dim">{r.budget ? fmt(r.budget) : "—"}</td>
-                    <td className="r mono">{r.exp ? fmt(r.exp) : "—"}</td>
-                    <td className="r mono" style={{ color: r.budget ? (d >= 0 ? "var(--emerald)" : "var(--clay)") : "var(--ink-soft)" }}>{r.budget ? ((d >= 0 ? "+" : "") + fmt(d)) : "—"}</td>
-                    <td className="r mono" style={{ color: r.partial ? "var(--ink-soft)" : r.net >= 0 ? "var(--emerald)" : "var(--clay)" }}>{(r.inc || r.exp) ? fmt(r.net) : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot><tr><td>Total</td><td className="r mono dim">{fmt(tot.budget)}</td><td className="r mono">{fmt(tot.exp)}</td>
-              <td className="r mono" style={{ color: (tot.budget - tot.exp) >= 0 ? "var(--emerald)" : "var(--clay)" }}>{((tot.budget - tot.exp) >= 0 ? "+" : "") + fmt(tot.budget - tot.exp)}</td>
-              <td className="r mono" style={{ color: (tot.inc - tot.exp) >= 0 ? "var(--emerald)" : "var(--clay)" }}>{fmt(tot.inc - tot.exp)}</td></tr></tfoot>
-          </table>
-          {partialRows.length > 0 && (
-            <div className="ap-gaplist">
-              <b>Partial months</b> have statements that aren't imported yet, so their income, spending and net are incomplete:
-              <ul>{partialRows.map((r) => <li key={r.key}><b>{r.label}</b> · missing {r.gaps.map((g) => gapLabel(state, g)).join("; ")}</li>)}</ul>
-            </div>
-          )}
-        </div>
-
-        <div className="ap-card">
-          <h3 className="ap-mini-t">Top categories · {period.label}</h3>
-          {topCats.length ? (
-            <ul className="ap-catbars">
-              {topCats.map((t) => (
-                <li key={t.c}>
-                  <div className="row"><span className="nm">{t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
-                  <div className="ap-track ap-track-sm"><div className="ap-fill" style={{ width: (t.v / maxCat * 100) + "%", background: "var(--clay)" }} /></div>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="ap-empty">Nothing spent in {period.label}.</p>}
-        </div>
-      </div>
-
-      <div className="ap-card" style={{ marginTop: 14 }}>
-        <h3 className="ap-mini-t">Top buckets · {period.label}</h3>
-        {hasBucketSpend ? (
-          <ul className="ap-catbars">
-            {topBuckets.map((t) => (
-              <li key={t.c}>
-                <div className="row"><span className="nm">{t.c === "Untagged" ? <span className="dim">Untagged</span> : t.c}</span><span className="mono vl">{fmt(t.v)}</span></div>
-                <div className="ap-track ap-track-sm"><div className="ap-fill" style={{ width: (t.v / maxBucket * 100) + "%", background: t.c === "Untagged" ? "var(--line)" : "var(--navy)" }} /></div>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="ap-empty">No bucketed spending in {period.label}. Tag expenses with a bucket when you log them, and they'll group here.</p>}
+      <div className="ap-dcard">
+        <FoldRow dot="flex" label="Top categories" value={topCats.length ? `${topCats[0][0]} ${fmt(topCats[0][1])}` : "none"} open={!!open.cats} onToggle={() => tog("cats")} />
+        {open.cats && <ul className="ap-mtop ap-mtop-card">{topCats.map(([c, v]) => <li key={c}><span>{c}</span><span>{fmt(v)}</span></li>)}</ul>}
+        {topBuckets.length > 0 && <>
+          <FoldRow dot="idle" label="Top buckets" value={`${topBuckets.length}`} open={!!open.bk} onToggle={() => tog("bk")} />
+          {open.bk && <ul className="ap-mtop ap-mtop-card">{topBuckets.map(([c, v]) => <li key={c}><span>{c}</span><span>{fmt(v)}</span></li>)}</ul>}
+        </>}
       </div>
     </>
   );
 }
 
-
 /* ================= TRENDS ================= */
 function Trends({ state, archives, period, currentYear, endYear, restoreYear }) {
-  const [selectedCats, setSelectedCats] = useState(["Groceries"]);
-  const tooLong = daysBetween(period.from, period.to) > 366;
   const allEntries = useMemo(() => {
     const seen = new Set(state.entries.map((e) => e.id));
     const extra = [];
     (archives || []).forEach((a) => (a.state?.entries || []).forEach((e) => { if (!seen.has(e.id)) { seen.add(e.id); extra.push(e); } }));
     return [...state.entries, ...extra];
   }, [state, archives]);
-  const baseYear = +period.to.slice(0, 4);
-  const years = useMemo(() => {
-    const ys = new Set(allEntries.map((e) => +String(e.date).slice(0, 4)).filter((y) => y > 1900));
-    ys.add(baseYear);
-    return [...ys].sort((a, b) => a - b);
-  }, [allEntries, baseYear]);
-  const windowFor = (yr) => ({ from: shiftYear(period.from, yr - baseYear), to: shiftYear(period.to, yr - baseYear) });
-  const trendData = useMemo(() => {
-    const result = {};
-    selectedCats.forEach((cat) => {
-      result[cat] = {};
-      years.forEach((yr) => {
-        const w = windowFor(yr);
-        result[cat][yr] = allEntries.filter((e) => e.type === "Expenses" && e.category === cat && e.date >= w.from && e.date <= w.to).reduce((a, e) => a + e.amount, 0);
-      });
-    });
-    return result;
-  }, [selectedCats, allEntries, years, period]);
-
-  const expenseCategories = state.categories.Expenses || [];
-  const colors = ["var(--clay)", "var(--teal)", "var(--navy)", "var(--emerald)"];
-  const maxV = Math.max(1, ...selectedCats.flatMap((c) => years.map((y) => trendData[c]?.[y] || 0)));
-  const p10 = Math.pow(10, Math.floor(Math.log10(maxV)));
-  const top = Math.ceil(maxV / p10) * p10;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * top);
-  const yPos = (v) => 250 - (v / top) * 200;
-  const tickLbl = (v) => v >= 1000 ? `$${+(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`;
-  const W = 50 + years.length * 80;
-
+  const ALL = "All expenses";
+  const cats = useMemo(() => {
+    const tot = {}; allEntries.forEach((e) => { if (e.type === "Expenses" && e.category) tot[e.category] = (tot[e.category] || 0) + e.amount; });
+    return [...new Set([...state.categories.Expenses, ...Object.keys(tot)])].sort((a, b) => (tot[b] || 0) - (tot[a] || 0));
+  }, [allEntries, state.categories]);
+  const [cat, setCat] = useState(ALL);
+  const [showYears, setShowYears] = useState(false);
+  const is = (e) => e.type === "Expenses" && (cat === ALL || e.category === cat);
+  const yr = +period.to.slice(0, 4), prevYr = yr - 1;
+  const thisMonth = localToday().slice(0, 7);
+  const byMonth = useMemo(() => {
+    const m = {}; allEntries.forEach((e) => { if (e.date && is(e)) { const k = countsMonth(e, state); m[k] = (m[k] || 0) + e.amount; } }); return m;
+  }, [allEntries, cat, state.settings]);
+  const key = (y, i) => `${y}-${String(i + 1).padStart(2, "0")}`;
+  const lastI = yr < +thisMonth.slice(0, 4) ? 11 : yr > +thisMonth.slice(0, 4) ? -1 : +thisMonth.slice(5) - 1;
+  const cur = MLABEL.map((_, i) => (i <= lastI ? Math.round(byMonth[key(yr, i)] || 0) : null));
+  const prev = MLABEL.map((_, i) => Math.round(byMonth[key(prevYr, i)] || 0));
+  const plan = (k) => (cat === ALL ? state.categories.Expenses.reduce((a, c) => a + planFor(state, "Expenses", c, k), 0) : planFor(state, "Expenses", cat, k));
+  const budget = MLABEL.map((_, i) => Math.round(plan(key(yr, i))));
+  // The number up top: this category over the dates picked at the top, against the same dates a year earlier.
+  const inWin = (e, from, to) => { const d = countsDate(e, state); return d && d >= from && d <= to; };
+  const v = allEntries.filter((e) => is(e) && inWin(e, period.from, period.to)).reduce((a, e) => a + e.amount, 0);
+  const pFrom = shiftYear(period.from, -1), pTo = shiftYear(period.to, -1);
+  const pv = allEntries.filter((e) => is(e) && inWin(e, pFrom, pTo)).reduce((a, e) => a + e.amount, 0);
+  const delta = pv > 0 ? Math.round(((v - pv) / pv) * 100) : null;
+  const ytd = cur.reduce((a, x) => a + (x || 0), 0), ytdPrev = prev.slice(0, lastI + 1).reduce((a, x) => a + x, 0);
+  const ytdPct = ytdPrev > 0 ? Math.round(((ytd - ytdPrev) / ytdPrev) * 100) : null;
+  const nMonths = lastI + 1, avg = nMonths > 0 ? ytd / nMonths : 0, budAvg = nMonths > 0 ? budget.slice(0, nMonths).reduce((a, x) => a + x, 0) / nMonths : 0;
+  const hasPrev = prev.some((x) => x > 0), hasBud = budget.some((x) => x > 0);
+  const pct = (p) => p == null ? null : <em className={p > 0 ? "worse" : "better"}>{p > 0 ? "+" : ""}{p}%</em>;
   return (
     <section className="ap-trends">
-      <div className="ap-trends-head">
-        <h2 className="ap-mini-t" style={{ fontSize: 24, margin: "0 0 6px" }}>Spending trends</h2>
-        <p className="ap-chartnote" style={{ margin: "0 0 12px" }}>Spending in <b>{period.label}</b>, compared with the same dates in other years.</p>
-        <div className="ap-trend-opts">
-          <label>Compare categories (tap to add or remove):</label>
-          <div className="ap-chipset">
-            {expenseCategories.map((c) => { const on = selectedCats.includes(c); return (
-              <button key={c} className={on ? "on" : ""} aria-pressed={on}
-                onClick={() => { const next = on ? selectedCats.filter((x) => x !== c) : [...selectedCats, c]; setSelectedCats(next.length ? next : [c]); }}>{c}</button>); })}
-          </div>
+      <section className="ap-hero">
+        <div className="ap-trend-top">
+          <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category">
+            <option value={ALL}>{ALL}</option>
+            {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <span className="ap-hero-lbl" style={{ letterSpacing: 0, textTransform: "none" }}>{hasPrev ? `${yr} vs ${prevYr}` : yr}</span>
         </div>
-      </div>
+        <div className="ap-trend-hero">
+          <span className="ap-hero-val">{fmt(v)}</span>
+          <span className="lbl">in {period.label}</span>
+          {delta != null && <span className={"chg " + (delta > 0 ? "worse" : "better")}>{delta > 0 ? "↑" : "↓"} {Math.abs(delta)}% vs {pFrom.slice(0, 4) === pTo.slice(0, 4) && isWholeMonths(period) && period.months.length === 1 ? monthLabel(pFrom.slice(0, 7)) : "a year earlier"}</span>}
+        </div>
+        <div className="ap-ckeys">
+          <span><i className="line" />{yr}</span>
+          {hasPrev && <span><i className="line prev" />{prevYr}</span>}
+          {hasBud && <span><i className="line bud" />Budget</span>}
+        </div>
+        {lastI >= 0 ? <TrendChart labels={MLABEL} cur={cur} prev={prev} budget={budget} curYear={yr} prevYear={prevYr} />
+          : <p className="ap-empty">{yr} hasn't started yet.</p>}
+        <div className="ap-tiles">
+          <div><span>Year so far</span><b>{fmt(ytd)}{pct(ytdPct)}</b></div>
+          <div><span>Monthly average</span><b>{fmt(avg)}{hasBud && <em className="of">of {fmt(budAvg)}</em>}</b></div>
+        </div>
+        {!hasPrev && <p className="ap-hero-notes">Once there's spending from {prevYr}, it shows as a dashed line to compare.</p>}
+      </section>
 
-      {tooLong ? (
-        <div className="ap-card"><p className="ap-empty">Pick a range of a year or less (for example This year, or Jul 1 to Sep 30) to compare it across years.</p></div>
-      ) : years.length > 1 ? (
-        <>
-          <div className="ap-card" style={{ marginBottom: 16 }}>
-            <svg viewBox={`0 0 ${W} 300`} width="100%" height="280" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Spending by year">
-              {ticks.map((val) => (
-                <g key={`g-${val}`}>
-                  <line x1="40" y1={yPos(val)} x2={W - 10} y2={yPos(val)} stroke="var(--line)" strokeWidth="0.5" />
-                  <text x="35" y={yPos(val) + 4} fontSize="10" fill="var(--ink-soft)" textAnchor="end" fontFamily="JetBrains Mono">{tickLbl(val)}</text>
-                </g>))}
-              {selectedCats.map((cat, ci) => {
-                const points = years.map((yr, i) => `${50 + i * 80},${yPos(trendData[cat]?.[yr] || 0)}`).join(" ");
-                return (<g key={`l-${cat}`}>
-                  <polyline points={points} fill="none" stroke={colors[ci % colors.length]} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                  {years.map((yr, i) => <circle key={`d-${cat}-${yr}`} cx={50 + i * 80} cy={yPos(trendData[cat]?.[yr] || 0)} r="3" fill={colors[ci % colors.length]} />)}
-                </g>);
-              })}
-              <line x1="40" y1="250" x2={W - 10} y2="250" stroke="var(--line)" strokeWidth="1.5" />
-              {years.map((yr, i) => (<text key={`y-${yr}`} x={50 + i * 80} y="275" fontSize="12" fill="var(--ink-soft)" textAnchor="middle" fontFamily="JetBrains Mono">{yr}</text>))}
-            </svg>
-            <div className="ap-legend">{selectedCats.map((cat, i) => (<span key={cat}><i style={{ background: colors[i % colors.length] }} />{cat}</span>))}</div>
+      <div className="ap-dcard">
+        <FoldRow dot="idle" label="Manage years" value={archives && archives.length ? `${archives.length} archived` : ""} open={showYears} onToggle={() => setShowYears(!showYears)} />
+        {showYears && <div className="ap-dhint">
+          Archiving saves this year's plan and starts {currentYear + 1} fresh. Transactions are never deleted, and you can restore a year any time.
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <button className="ap-archivebtn" onClick={endYear}>Archive {currentYear} and start {currentYear + 1}</button>
+            {(archives || []).slice().sort((a, b) => b.year - a.year).map((a) => (
+              <button key={a.year} className="ap-restorebtn" onClick={() => restoreYear(a.year)}>Restore {a.year}</button>))}
           </div>
-
-          <div className="ap-card">
-            <table className="ap-yeartable">
-              <thead><tr><th>Category</th>{years.map((yr) => (<th key={yr} className="r">{yr}</th>))}<th className="r">Change</th><th className="r">%</th></tr></thead>
-              <tbody>
-                {selectedCats.map((cat) => {
-                  const vals = years.map((yr) => trendData[cat]?.[yr] || 0);
-                  const lastV = vals[vals.length - 1], prev = vals[vals.length - 2] || 0;
-                  const change = lastV - prev, pct = prev > 0 ? ((change / prev) * 100) : 0;
-                  return (<tr key={cat}>
-                    <td className="mlbl">{cat}</td>
-                    {vals.map((v, i) => (<td key={years[i]} className="r mono">{fmt(v)}</td>))}
-                    <td className="r mono" style={{ color: change >= 0 ? "var(--clay)" : "var(--emerald)" }}>{(change >= 0 ? "+" : "") + fmt(change)}</td>
-                    <td className="r mono" style={{ color: pct >= 0 ? "var(--clay)" : "var(--emerald)" }}>{(pct >= 0 ? "+" : "") + pct.toFixed(0)}%</td>
-                  </tr>);
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        <div className="ap-card"><p className="ap-empty">Only {baseYear} has transactions so far. Once there's another year of spending, it's compared here.</p></div>
-      )}
-
-      <div className="ap-card ap-manageyears">
-        <h3 className="ap-mini-t">Manage years</h3>
-        <p className="ap-chartnote" style={{ margin: "0 0 14px" }}>Archiving snapshots the current year and clears the plan so you can start fresh. It's <b>reversible</b>: your transactions are never deleted, and you can restore any year below.</p>
-        <button className="ap-archivebtn" onClick={endYear}>Archive {currentYear} &amp; start {currentYear + 1}</button>
-        {(archives && archives.length > 0) && (
-          <div className="ap-archlist">
-            <div className="ap-archlbl">Archived years</div>
-            {archives.slice().sort((a, b) => b.year - a.year).map((a) => (
-              <div key={a.year} className="ap-archrow">
-                <span className="yr">{a.year}</span>
-                <button className="ap-restorebtn" onClick={() => restoreYear(a.year)}>Restore</button>
-              </div>
-            ))}
-          </div>
-        )}
+        </div>}
       </div>
     </section>
   );
@@ -3464,45 +3503,48 @@ function Split({ state, period, setSplit }) {
   const maoPct = total>0 ? Math.round(mao/total*100) : 50;
   const ingridPct = 100 - maoPct;
 
+  // Which bills show on their own line is fixed when the tab opens, so a row doesn't jump away while you adjust it.
+  const snap = useRef({ key: null, set: new Set() });
+  const sk = period.from + period.to + cats.length;
+  if (snap.current.key !== sk) snap.current = { key: sk, set: new Set(cats.filter((c) => pctOf(c) !== 50)) };
+  const special = cats.filter((c) => snap.current.set.has(c)), even = cats.filter((c) => !snap.current.set.has(c));
+  const [openEven, setOpenEven] = useState(false);
   return (
     <section className="ap-split">
-      <p className="ap-plan-hint" style={{marginBottom:14}}>Set who pays each budgeted expense for <b>{period.label}</b>. Use the presets, or tap <b>Custom</b> to split a bill any way — like a 60/40 mortgage or a shared car payment. Totals update live.</p>
-
-      <section className="ap-summary" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
-        <Stat label="Mao covers" val={mao} color="var(--navy)"/>
-        <Stat label="Ingrid covers" val={ingrid} color="var(--teal)"/>
-        <Stat label="Total" val={total} hero/>
-      </section>
-
-      {total>0 && (
-        <div className="ap-splitsummary">
-          <div className="ap-splitbar">
-            <div className="m" style={{width:maoPct+"%"}}/>
-            <div className="i" style={{width:ingridPct+"%"}}/>
-          </div>
-          <div className="ap-splitpct">
-            <span><i style={{background:"var(--navy)"}}/>Mao {maoPct}%</span>
-            <span><i style={{background:"var(--teal)"}}/>Ingrid {ingridPct}%</span>
-          </div>
-          <p className="ap-chartnote" style={{marginTop:10}}>
-            {Math.abs(diff) < 0.5
-              ? "Right now you're splitting this evenly."
-              : <>An even split would be <b>{fmt(half)}</b> each. {diff>0?"Mao":"Ingrid"} is covering {fmt(Math.abs(diff))} more than half — if you wanted to even it out, {diff>0?"Ingrid":"Mao"} would chip in that much. Entirely your call.</>}
-          </p>
+      <section className="ap-hero">
+        <div className="ap-hero-lbl">Who covers {period.label}'s budget</div>
+        <div className="ap-splithero">
+          <div><span>Mao</span><b>{fmt(mao)}</b></div>
+          <div className="r"><span>Ingrid</span><b>{fmt(ingrid)}</b></div>
         </div>
-      )}
-
-      <div className="ap-splitlist">
-        {cats.map((c)=>(
-          <SplitRow key={c} cat={c} amount={planAmt(c)} pct={pctOf(c)} onSet={(p)=>setSplit(c,p)}/>
-        ))}
-        {cats.length===0 && <p className="ap-empty">No budgeted expenses for {period.label}. Set budgets in Planning first.</p>}
-      </div>
+        {total > 0 && <div className="ap-splitbar"><div className="m" style={{ width: maoPct + "%" }} /><div className="i" style={{ width: ingridPct + "%" }} /></div>}
+        <div className="ap-hero-notes">{total <= 0 ? "No budgeted expenses yet. Set budgets in Planning first."
+          : Math.abs(diff) < 0.5 ? `Split evenly: ${fmt(half)} each.`
+          : `${diff > 0 ? "Mao" : "Ingrid"} covers ${fmt(Math.abs(diff))} more than half (${maoPct}% / ${ingridPct}%).`}</div>
+      </section>
+      {total > 0 && <div className="ap-dcard">
+        {special.map((c) => <SplitLine key={c} cat={c} amount={planAmt(c)} pct={pctOf(c)} onSet={(p) => setSplit(c, p)} />)}
+        {even.length > 0 && <FoldRow dot="idle" label="Split evenly" value={`${even.length} · ${fmt(even.reduce((a, c) => a + planAmt(c), 0))}`} open={openEven} onToggle={() => setOpenEven(!openEven)} />}
+        {openEven && even.map((c) => <SplitLine key={c} cat={c} amount={planAmt(c)} pct={pctOf(c)} onSet={(p) => setSplit(c, p)} />)}
+      </div>}
+      {total > 0 && <p className="ap-tfoot">Tap a bill to change who pays it, for example a 60/40 mortgage.</p>}
     </section>
   );
 }
+function SplitLine({ cat, amount, pct, onSet }) {
+  const [open, setOpen] = useState(false);
+  const label = pct === 100 ? "Mao" : pct === 0 ? "Ingrid" : pct === 50 ? "50 / 50" : `${pct} / ${100 - pct}`;
+  return (
+    <div className={"ap-drow" + (open ? " open" : "")}>
+      <button className="ap-drow-main" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="nm">{cat}</span><span className="amt">{fmt(amount)}</span><span className="ap-splitpill">{label}</span>
+      </button>
+      {open && <div className="ap-drow-more"><SplitRow cat={cat} amount={amount} pct={pct} onSet={onSet} bare /></div>}
+    </div>
+  );
+}
 
-function SplitRow({ cat, amount, pct, onSet }) {
+function SplitRow({ cat, amount, pct, onSet, bare }) {
   const isPreset = pct===0 || pct===50 || pct===100;
   const [showCustom, setShowCustom] = useState(!isPreset);
   const maoAmt = Math.round(amount*pct/100);
@@ -3513,7 +3555,7 @@ function SplitRow({ cat, amount, pct, onSet }) {
   return (
     <div className="ap-splitrowwrap">
       <div className="ap-splitrow">
-        <div className="ap-splitcat"><span className="nm">{cat}</span><span className="mono amt">{fmt(amount)}</span></div>
+        {!bare && <div className="ap-splitcat"><span className="nm">{cat}</span><span className="mono amt">{fmt(amount)}</span></div>}
         <div className="ap-seg">
           {preset(100,"Mao")}
           {preset(50,"50/50")}
@@ -4943,6 +4985,119 @@ function Styles() {
     .ap-drow.open{grid-column:1/-1;border-right:none !important;}
   }
   .ap-hero-val{font-size:34px;}
+
+  /* planning v3 */
+  .ap-planhero-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .ap-hero-val.ok{color:var(--emerald);} .ap-hero-val.neg{color:var(--clay);}
+  .ap-plantot{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-top:8px;}
+  .ap-plantot b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
+  .ap-planhero .ap-balance{margin:10px 0 0;}
+  .ap-dot.inc{background:var(--emerald);} .ap-dot.flex{background:#D85A30;} .ap-dot.nm{background:#BA7517;} .ap-dot.sav{background:var(--teal);}
+  .ap-dcard .ap-planrows{border-bottom:1px solid var(--line);background:#fff;}
+  .ap-dcard .ap-planrow{display:block;padding:0;border-bottom:1px solid var(--line);}
+  .ap-dcard .ap-planrow:last-child{border-bottom:none;}
+  .ap-planrow-line{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 34px;min-height:44px;box-sizing:border-box;}
+  .ap-planrow-line .ap-planrow-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;background:none;border:none;padding:0;cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);}
+  .ap-planrow-line .ap-planrow-name{font-size:14.5px;border:none;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .ap-planrow-line .ap-planrow-sub{font-size:11.5px;margin:1px 0 0;}
+  .ap-planrow.zero .ap-planrow-line .ap-planrow-name{color:var(--ink-soft);}
+  .ap-planrow.open{background:var(--paper2);}
+  .ap-planrow-more{padding:0 12px 12px 34px;}
+  .ap-planrow-facts{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;}
+  .ap-planrow-facts b{color:var(--ink);font-weight:600;}
+  .ap-planrow-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .ap-planrow-tools .ap-renamein{flex:1;min-width:140px;}
+  .ap-planrow-tools .ap-del{font-family:'Archivo';font-size:13px;font-weight:600;color:var(--clay);border:1.5px solid var(--line);border-radius:8px;padding:6px 12px;}
+  .ap-use{white-space:nowrap;font-size:12px;}
+  .ap-addrow{padding:10px 12px;margin:0;border-top:1px solid var(--line);}
+  .ap-addrow input{min-width:0;}
+  .ap-addrow select,.ap-addrow button{flex:none;}
+  .ap-addrow select{font-family:'Archivo';font-size:13px;border:1.5px solid var(--line);border-radius:8px;padding:0 6px;background:var(--paper);}
+  .ap-dcard .ap-paysetting{margin:0;}
+  .ap-dcard .ap-plansec{border:none;background:none;padding:0;margin:0;}
+  @media(max-width:600px){ .ap-planrow-line{padding-left:14px;} .ap-planrow-more{padding-left:14px;} .ap-planhero-top .ap-logbtn{width:100%;} }
+
+  /* tracking v3 */
+  .ap-tbar{display:flex;gap:8px;margin-bottom:8px;}
+  .ap-tbar .ap-search{flex:1;min-width:0;font-family:'Archivo';font-size:14px;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--paper2);outline:none;}
+  .ap-tbar .ap-search:focus{border-color:var(--navy);}
+  .ap-tbar .ap-iobtn{flex:none;}
+  .ap-iobtn.on{border-color:var(--navy);color:var(--navy);}
+  .ap-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .ap-pills button{font-family:'Archivo';font-size:13px;font-weight:600;border:1.5px solid var(--line);background:var(--paper2);color:var(--ink-soft);border-radius:20px;padding:5px 12px;cursor:pointer;min-height:32px;}
+  .ap-pills button.on{background:var(--navy);border-color:var(--navy);color:var(--paper2);}
+  .ap-tmore{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+  .ap-tmore select{font-family:'Archivo';font-size:13.5px;border:1.5px solid var(--line);border-radius:8px;padding:8px;background:var(--paper2);min-width:0;}
+  .ap-tday{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--paper);padding:7px 14px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+  .ap-trow{width:100%;display:flex;align-items:center;gap:10px;padding:8px 14px;min-height:46px;background:none;border:none;border-bottom:1px solid var(--line);cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);}
+  .ap-trow .nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  .ap-trow .t{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-trow .sub{font-size:12px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-trow .amt{font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ap-trow .amt.income{color:var(--emerald);} .ap-trow .amt.savings{color:var(--teal);}
+  .ap-trow:hover{background:#fff;}
+  .ap-tlist>.ap-trow:last-child,.ap-tlist>.ap-dgroup:last-child{border-bottom:none;}
+  .ap-tfoot{text-align:center;font-size:12.5px;color:var(--ink-soft);margin:-2px 0 14px;}
+  .ap-tedit{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ap-tedit label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink-soft);min-width:0;}
+  .ap-tedit input,.ap-tedit select{width:100%;box-sizing:border-box;}
+  .ap-tedit .wide{grid-column:1/-1;}
+  .ap-tedit input[type=text],.ap-tedit input[type=date],.ap-tedit select{font-family:'Archivo';font-size:15px;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);min-width:0;}
+  .ap-tedit .ap-amtwrap input{width:100%;text-align:left;}
+  .ap-tdel{color:var(--clay);margin-right:auto;}
+  @media(min-width:700px){ .ap-tlist .ap-trow .t{font-size:14px;} }
+
+  /* charts + by month v3 */
+  .ap-chartbox{position:relative;width:100%;margin-top:6px;}
+  .ap-ctip{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;min-height:22px;font-size:13px;color:var(--ink-soft);margin:2px 0 4px;font-variant-numeric:tabular-nums;}
+  .ap-ctip b{font-weight:600;color:var(--ink);}
+  .ap-ctip .hint{color:#9AA1AC;font-size:12.5px;}
+  .ap-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .ap-tiles>div{background:var(--paper);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;}
+  .ap-tiles span{font-size:12px;color:var(--ink-soft);} .ap-tiles b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .ap-tiles em{font-style:normal;font-size:12px;font-weight:600;margin-left:6px;}
+  .ap-ckeys{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-soft);margin-top:14px;}
+  .ap-ckeys i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;}
+  .ap-ckeys i.dash{border:1.5px dashed #9b9a93;box-sizing:border-box;}
+  .ap-ckeys i.line{height:0;width:16px;border-radius:0;border-top:2px solid #2a78d6;vertical-align:3px;}
+  .ap-ckeys i.line.prev{border-top:2px dashed #9b9a93;} .ap-ckeys i.line.bud{border-top:1px dotted #9b9a93;}
+  .ap-dot.ahead{background:#2a78d6;} .ap-dot.behind{background:#e34948;} .ap-dot.dash{background:none;border:2px dashed #9b9a93;box-sizing:border-box;}
+  .ap-mrow{border-bottom:1px solid var(--line);} .ap-mrow:last-child{border-bottom:none;}
+  .ap-mrow.open{background:#fff;}
+  .ap-mrow .mlbl{width:38px;font-size:14.5px;font-weight:600;}
+  .ap-msub{flex:1;min-width:0;font-size:12.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-mrow .amt{font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink);}
+  .ap-mrow .amt.neg{color:var(--clay);}
+  .ap-mtop{list-style:none;margin:6px 0 10px;padding:0;}
+  .ap-mtop li{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--line);font-variant-numeric:tabular-nums;}
+  .ap-mtop-card{margin:0;padding:4px 14px 8px 34px;background:#fff;border-bottom:1px solid var(--line);}
+
+  /* trends v3 */
+  .ap-trend-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .ap-trend-top select{font-family:'Archivo';font-size:15px;font-weight:600;border:1.5px solid var(--line);border-radius:9px;padding:7px 10px;background:#fff;color:var(--ink);max-width:62%;}
+  .ap-trend-hero{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px;}
+  .ap-trend-hero .lbl{font-size:13px;color:var(--ink-soft);}
+  .ap-trend-hero .chg{font-size:13px;font-weight:600;}
+  .worse{color:var(--clay);} .better{color:var(--emerald);}
+  .ap-tiles em.worse,.ap-tiles em.better{font-style:normal;}
+  .ap-tiles em.of{color:var(--ink-soft);font-weight:400;}
+  .ap-hero .ap-hero-notes{margin-top:10px;}
+
+  /* split v3 */
+  .ap-splithero{display:flex;justify-content:space-between;gap:12px;margin:6px 0 10px;}
+  .ap-splithero>div{display:flex;flex-direction:column;} .ap-splithero .r{text-align:right;align-items:flex-end;}
+  .ap-splithero span{font-size:13px;color:var(--ink-soft);}
+  .ap-splithero b{font-family:'Fraunces',serif;font-size:28px;font-weight:500;font-variant-numeric:tabular-nums;}
+  .ap-splitpill{font-size:12px;font-weight:600;border:1.5px solid var(--line);border-radius:20px;padding:2px 10px;white-space:nowrap;color:var(--ink);}
+  .ap-split .ap-drow-more .ap-splitrow{border:none;padding:0;}
+  .ap-split .ap-drow-more .ap-splitrowwrap{border:none;padding:0;margin:0;background:none;}
+
+  /* finished months */
+  .ap-closebar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;}
+  .ap-closebar span{font-size:12.5px;}
+  .ap-closebar .ap-imp-secondary{background:#fff;}
+  .ap-closednote{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--emerald);background:#E7F1EA;border:1px solid #BFD9C9;border-radius:10px;padding:8px 12px;margin:-4px 0 12px;}
+  .ap-mrow-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   `}</style>);
 }
 
