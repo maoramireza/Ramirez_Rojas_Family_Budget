@@ -1282,7 +1282,7 @@ window.saveArchive = async (year, state) => {
 
 const BASELINE = {"categories": {"Income": ["Salary Mao", "Salary Ingrid", "Primas Ingrid", "Other"], "Expenses": ["House Mortgage", "Cell phones", "Pepco", "Water", "Amazon Prime", "Disney+", "Netflix", "Sofa", "Apple Care Ipad y Celular Mao", "Car Insurance", "Verizon", "Peloton Monthly subscription", "Metro", "Gas", "Groceries", "Restaurants and fun", "Shopping", "Carro", "Mantenimiento casa", "Futbol Luca", "Lavado carro", "Pelo Ingrid", "Comedor"], "Savings": ["Ahorro Ingrid", "Ahorro Mao"]}, "buckets": {"Subscriptions": {"name": "Subscriptions"}, "Utilities": {"name": "Utilities"}, "Transportation": {"name": "Transportation"}, "Entertainment": {"name": "Entertainment"}}, "plan": {"Income": {"Salary Mao": {"2024-06": 4700, "2024-07": 4700, "2024-08": 4700, "2024-09": 4700, "2024-10": 4700, "2024-11": 4700, "2024-12": 4700}, "Salary Ingrid": {"2024-06": 4870, "2024-07": 4870, "2024-08": 4870, "2024-09": 4870, "2024-10": 4870, "2024-11": 4870, "2024-12": 4870}, "Primas Ingrid": {"2024-07": 1000, "2024-12": 2300}, "Other": {}}, "Expenses": {"House Mortgage": {"2024-06": 4050, "2024-07": 4050, "2024-08": 4050, "2024-09": 4050, "2024-10": 4050, "2024-11": 4050, "2024-12": 4050}, "Cell phones": {"2024-06": 86, "2024-07": 86, "2024-08": 86, "2024-09": 86, "2024-10": 86, "2024-11": 86, "2024-12": 86}, "Pepco": {"2024-06": 180, "2024-07": 190, "2024-08": 190, "2024-09": 180, "2024-10": 170, "2024-11": 190, "2024-12": 200}, "Water": {"2024-06": 200, "2024-08": 200, "2024-10": 200, "2024-12": 200}, "Amazon Prime": {"2024-06": 15, "2024-07": 15, "2024-08": 15, "2024-09": 15, "2024-10": 15, "2024-11": 15, "2024-12": 15}, "Disney+": {"2024-06": 20, "2024-07": 20, "2024-08": 20, "2024-09": 20, "2024-10": 20, "2024-11": 20, "2024-12": 20}, "Netflix": {"2024-06": 10, "2024-07": 10, "2024-08": 10, "2024-09": 10, "2024-10": 10, "2024-11": 10, "2024-12": 10}, "Sofa": {"2024-06": 1410, "2024-07": 1450, "2024-08": 1450, "2024-09": 950}, "Apple Care Ipad y Celular Mao": {"2024-06": 22, "2024-07": 22, "2024-08": 22, "2024-09": 22, "2024-10": 22, "2024-11": 22, "2024-12": 22}, "Car Insurance": {"2024-06": 207, "2024-07": 207, "2024-08": 207, "2024-09": 207, "2024-10": 207, "2024-11": 207, "2024-12": 207}, "Verizon": {"2024-06": 90, "2024-07": 90, "2024-08": 90, "2024-09": 90, "2024-10": 90, "2024-11": 90, "2024-12": 90}, "Peloton Monthly subscription": {"2024-06": 47, "2024-07": 47, "2024-08": 47, "2024-09": 47, "2024-10": 47, "2024-11": 47, "2024-12": 47}, "Metro": {"2024-06": 140, "2024-07": 140, "2024-08": 140, "2024-09": 140, "2024-10": 140, "2024-11": 140, "2024-12": 140}, "Gas": {"2024-06": 300, "2024-07": 300, "2024-08": 300, "2024-09": 300, "2024-10": 300, "2024-11": 300, "2024-12": 300}, "Groceries": {"2024-06": 728, "2024-07": 800, "2024-08": 800, "2024-09": 800, "2024-10": 750, "2024-11": 750, "2024-12": 1150}, "Restaurants and fun": {"2024-06": 500, "2024-07": 500, "2024-08": 400, "2024-09": 300, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Shopping": {"2024-06": 500, "2024-07": 500, "2024-08": 500, "2024-09": 500, "2024-10": 500, "2024-11": 500, "2024-12": 2000}, "Carro": {"2024-06": 25, "2024-07": 25, "2024-08": 25, "2024-09": 25, "2024-10": 25, "2024-11": 25, "2024-12": 25}, "Mantenimiento casa": {"2024-06": 1000}, "Futbol Luca": {"2024-07": 250, "2024-08": 266, "2024-10": 266, "2024-12": 266}, "Lavado carro": {"2024-06": 40, "2024-07": 40, "2024-08": 40, "2024-09": 40, "2024-10": 40, "2024-11": 40, "2024-12": 40}, "Pelo Ingrid": {"2024-09": 350}, "Comedor": {"2024-10": 2132}}, "Savings": {"Ahorro Ingrid": {"2024-07": 1414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 502}, "Ahorro Mao": {"2024-07": 414, "2024-08": 356, "2024-09": 719, "2024-11": 1289, "2024-12": 500}}}};
 const TYPES = ["Income", "Expenses", "Savings"];
-const APP_VERSION = "2026-09-30 (compact tabs)";
+const APP_VERSION = "2026-09-30 (tidy lists)";
 const MLABEL = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const pad = (n) => String(n).padStart(2, "0");
 const mk = (y, m) => `${y}-${pad(m)}`;
@@ -2178,7 +2178,7 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan, setMonthClose
         <i className={"ap-dot " + dot} aria-hidden="true" /><span className="nm">{label}</span><span className="amt">{value}</span>
         <span className="chev" aria-hidden="true">{open[k] || q ? "Hide" : "Show"}</span>
       </button>
-      {(open[k] || q) && <div className="ap-dgrid">{rows.map(dotRow)}{children}</div>}
+      {(open[k] || q) && <><div className="ap-dgrid">{rows.map(dotRow)}</div>{children}</>}
     </>
   );
   const month = n === 1 ? MLABEL[+period.months[0].slice(5) - 1] : period.label;
@@ -2262,7 +2262,11 @@ function Dashboard({ state, period, addEntry, deleteEntry, goPlan, setMonthClose
 
 // One category: a dot, the name and what's left. Tap it for the details, its transactions and a quick log.
 function DotRow({ env, light, items, defDate, addEntry, onDelete }) {
+  // Phones open the details under the line; wider screens (two columns) open them in a small window,
+  // so the columns never get pushed apart.
   const [open, setOpen] = useState(false);
+  const [asSheet, setAsSheet] = useState(false);
+  const toggle = () => { const wide = !!(window.matchMedia && window.matchMedia("(min-width:700px)").matches); setAsSheet(wide); setOpen(!open); };
   const [amt, setAmt] = useState("");
   const [note, setNote] = useState("");
   const submit = () => {
@@ -2276,13 +2280,13 @@ function DotRow({ env, light, items, defDate, addEntry, onDelete }) {
     : Math.round(diff) < 0 ? `${fmt(-diff)} over` : light.bill && s === "green" ? "Paid" : `${fmt(diff)} left`;
   const pct = env.budget > 0 ? Math.min(100, (env.spent / env.budget) * 100) : 100;
   return (
-    <div className={"ap-drow s-" + s + (open ? " open" : "")}>
-      <button className="ap-drow-main" onClick={() => setOpen(!open)} aria-expanded={open}>
+    <div className={"ap-drow s-" + s + (open && !asSheet ? " open" : "")}>
+      <button className="ap-drow-main" onClick={toggle} aria-expanded={open}>
         <i className={"ap-dot " + s} aria-hidden="true" />
         <span className="nm">{env.c}</span>
         <span className="amt">{right}</span>
       </button>
-      {open && (
+      {open && (() => { const body = (
         <div className="ap-drow-more">
           <div className="ap-drow-fact">
             {env.budget > 0 ? <>{fmt2(env.spent)} of {fmt(env.budget)} · {Math.round(pct)}%{light.pace ? " · spending ahead of the calendar" : ""}</> : <>{fmt2(env.spent)} spent · no budget this month</>}
@@ -2305,8 +2309,8 @@ function DotRow({ env, light, items, defDate, addEntry, onDelete }) {
               {items.length > 30 && <li className="more">and {items.length - 30} more in Tracking</li>}
             </ul>
           )}
-        </div>
-      )}
+        </div>);
+        return asSheet ? <Sheet title={env.c} sub={right} label={env.c} onClose={() => setOpen(false)}>{body}</Sheet> : body; })()}
     </div>
   );
 }
@@ -2581,7 +2585,7 @@ function Planning({ state, period, setSetting, setPlanAmt, clearOverride, setCat
     ["Income", "Income", "inc", state.categories.Income, "Income"],
     ["fixed", "Bills", "bill", inGroup("fixed"), "Expenses"],
     ["flex", "Everyday", "flex", inGroup("flex"), "Expenses"],
-    ["nonmonthly", "Non-monthly", "nm", inGroup("nonmonthly"), "Expenses"],
+    ["nonmonthly", "Non-monthly", "nonmo", inGroup("nonmonthly"), "Expenses"],
     ["Savings", "Savings", "sav", state.categories.Savings, "Savings"],
   ];
   const mlabel = MLABEL[+first.slice(5) - 1];
@@ -3104,14 +3108,47 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
 
   const [more, setMore] = useState(false);
   const [limit, setLimit] = useState(150);
-  useEffect(() => setLimit(150), [q, ftype, fcat, fsrc, period.from, period.to]);
+  const [openDays, setOpenDays] = useState(null);      // null = the three most recent days open
+  useEffect(() => { setLimit(150); setOpenDays(null); }, [q, ftype, fcat, fsrc, period.from, period.to]);
   const sign = (x) => ((x.type === "Income") !== (x.amount < 0) ? 1 : -1);
   const days = [];
   list.slice(0, limit).forEach((x) => { const last = days[days.length - 1]; if (last && last.date === x.date) last.items.push(x); else days.push({ date: x.date, items: [x] }); });
   const dayNet = (d) => d.items.reduce((a, x) => a + (x.type === "Savings" ? 0 : sign(x) * Math.abs(x.amount)), 0);
+  // Collapsed days still say what happened: the biggest categories that day, with how many times.
+  const daySummary = (d) => {
+    const m = {}; d.items.forEach((x) => { const k = x.category; m[k] = m[k] || { n: 0, v: 0 }; m[k].n++; m[k].v += Math.abs(x.amount); });
+    return Object.entries(m).sort((a, b) => b[1].v - a[1].v).slice(0, 3).map(([c, o]) => c + (o.n > 1 ? ` ×${o.n}` : "")).join(" · ") + (Object.keys(m).length > 3 ? " …" : "");
+  };
+  const isOpen = (d, i) => (q ? true : openDays ? !!openDays[d.date] : i < 3);
+  const toggleDay = (d, i) => setOpenDays((o) => { const base = o || Object.fromEntries(days.slice(0, 3).map((x) => [x.date, true])); return { ...base, [d.date]: !isOpen(d, i) }; });
+  const allOpen = days.length > 0 && days.every((d, i) => isOpen(d, i));
+  const setAll = (v) => setOpenDays(Object.fromEntries(days.map((d) => [d.date, v])));
   const money = (v) => (v < 0 ? "−" : "+") + fmt2(Math.abs(v));
   const edit = editId ? state.entries.find((x) => x.id === editId) : null;
   const filtersOn = fcat !== "All" || fsrc !== "all";
+  // Three or more of the same thing on the same day (ten "Vacaciones · Cad" charges) fold into one line you can open.
+  const [openGrp, setOpenGrp] = useState({});
+  const groupsOf = (items) => { const out = [], at = {};
+    items.forEach((x) => { const k = x.type + "|" + x.category + "|" + (x.note || x.name || ""); if (at[k] == null) { at[k] = out.length; out.push({ k, items: [x] }); } else out[at[k]].items.push(x); });
+    return out; };
+  const amtOf = (x) => (x.type === "Savings" ? fmt2(Math.abs(x.amount)) : money(sign(x) * Math.abs(x.amount)));
+  const rowEl = (x, sub) => {
+    const note = x.note || x.name || "", raw = x.src && x.src.raw && x.src.raw !== note ? x.src.raw : "";
+    const cin = x.date && countsMonth(x, state) !== x.date.slice(0, 7) ? MLABEL[+countsMonth(x, state).slice(5) - 1] : null;
+    return (
+      <button key={x.id} className={"ap-trow" + (sub ? " sub" : "")} onClick={() => setEditId(x.id)}>
+        <i className={"ap-tdot " + x.type.toLowerCase()} aria-label={x.type} />
+        <span className="cat">{sub ? (raw || note || x.category) : x.category}</span>
+        <span className="det">{!sub && note && <span className="note">{note}</span>}{!sub && raw && <span className="raw">{raw}</span>}</span>
+        <span className="tags">
+          {x.bucket && <em className="ap-cnt">{x.bucket}</em>}
+          {x.importId && <span className="ap-srcpdf">{x.src && x.src.photo ? "PHOTO" : "PDF"}</span>}
+          {cin && <span className="ap-countsin">counts in {cin}</span>}
+        </span>
+        <span className={"amt " + x.type.toLowerCase()}>{amtOf(x)}</span>
+      </button>
+    );
+  };
 
   return (
     <section className="ap-track2">
@@ -3120,8 +3157,11 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
         <button className="ap-iobtn strong" onClick={openImport}>Import</button>
         <button className={"ap-iobtn" + (more || filtersOn ? " on" : "")} onClick={() => setMore(!more)} aria-expanded={more} aria-label="More filters and tools">⋯</button>
       </div>
-      <div className="ap-pills" role="radiogroup" aria-label="Type">
-        {["All", ...TYPES].map((t) => <button key={t} className={ftype === t ? "on" : ""} role="radio" aria-checked={ftype === t} onClick={() => { setFtype(t); setFcat("All"); }}>{t}</button>)}
+      <div className="ap-tbar2">
+        <div className="ap-pills" role="radiogroup" aria-label="Type">
+          {["All", ...TYPES].map((t) => <button key={t} className={ftype === t ? "on" : ""} role="radio" aria-checked={ftype === t} onClick={() => { setFtype(t); setFcat("All"); }}>{t}</button>)}
+        </div>
+        {days.length > 1 && !q && <button className="ap-linkbtn" onClick={() => setAll(!allOpen)}>{allOpen ? "Collapse all" : "Expand all"}</button>}
       </div>
       {more && (
         <div className="ap-tmore">
@@ -3143,18 +3183,32 @@ function Transactions({ state, period, editEntry, deleteEntry, importTxns, setBu
       {msg && <div className="ap-importmsg">{msg}</div>}
 
       <div className="ap-dcard ap-tlist">
-        {days.map((d) => { const dn = dayNet(d); return (
+        {days.map((d, i) => { const dn = dayNet(d), op = isOpen(d, i); return (
           <React.Fragment key={d.date}>
-            <div className="ap-tday"><span>{niceDate(d.date)}</span><span>{Math.round(dn * 100) ? money(dn) : ""}</span></div>
-            {d.items.map((x) => (
-              <button key={x.id} className="ap-trow" onClick={() => setEditId(x.id)}>
-                <span className="nm">
-                  <span className="t">{x.category}{x.bucket && <em className="ap-cnt" style={{ marginLeft: 6 }}>{x.bucket}</em>}{x.date && countsMonth(x, state) !== x.date.slice(0,7) && <span className="ap-countsin">counts in {MLABEL[+countsMonth(x, state).slice(5)-1]}</span>}</span>
-                  {(x.note || x.name || (x.src && x.src.raw)) && <span className="sub">{x.note || x.name || x.src.raw}</span>}
-                </span>
-                <span className={"amt " + x.type.toLowerCase()}>{x.type === "Savings" ? fmt2(Math.abs(x.amount)) : money(sign(x) * Math.abs(x.amount))}</span>
-              </button>
-            ))}
+            <button className={"ap-tday" + (op ? " open" : "")} onClick={() => toggleDay(d, i)} aria-expanded={op}>
+              <span className="chev" aria-hidden="true">{op ? "▾" : "▸"}</span>
+              <span className="dt">{niceDate(d.date)}</span>
+              <span className="cnt">{d.items.length}</span>
+              <span className="sum">{op ? "" : daySummary(d)}</span>
+              <span className={"net" + (dn > 0 ? " in" : "")}>{Math.round(dn * 100) ? money(dn) : ""}</span>
+            </button>
+            {op && groupsOf(d.items).map((g) => {
+              if (g.items.length < 3) return g.items.map((x) => rowEl(x, false));
+              const x0 = g.items[0], gk = d.date + "|" + g.k, go = !!openGrp[gk];
+              const tot = g.items.reduce((a, x) => a + (x.type === "Savings" ? Math.abs(x.amount) : sign(x) * Math.abs(x.amount)), 0);
+              return (
+                <React.Fragment key={gk}>
+                  <button className={"ap-trow grp" + (go ? " open" : "")} onClick={() => setOpenGrp((o) => ({ ...o, [gk]: !o[gk] }))} aria-expanded={go}>
+                    <i className={"ap-tdot " + x0.type.toLowerCase()} aria-label={x0.type} />
+                    <span className="cat">{x0.category}</span>
+                    <span className="det"><span className="note">{(x0.note || x0.name) ? `${x0.note || x0.name} · ` : ""}{g.items.length} charges</span></span>
+                    <span className="tags"><span className="ap-grpchev">{go ? "Hide" : "Show"}</span></span>
+                    <span className={"amt " + x0.type.toLowerCase()}>{x0.type === "Savings" ? fmt2(tot) : money(tot)}</span>
+                  </button>
+                  {go && g.items.map((x) => rowEl(x, true))}
+                </React.Fragment>
+              );
+            })}
           </React.Fragment>); })}
         {list.length > limit && <button className="ap-dgroup" onClick={() => setLimit(limit + 300)}><span className="nm">Show more</span><span className="amt">{list.length - limit} more</span></button>}
         {list.length===0 && <p className="ap-empty">{state.entries.length ? `No transactions in ${period.label} match. Try All time at the top.` : "No transactions yet. Log one from Home."}</p>}
@@ -4930,6 +4984,7 @@ function Styles() {
   .ap-lines .ap-billlist{border:none;border-radius:0;margin:0;border-bottom:1px solid var(--line);background:#fff;}
   .ap-lines .ap-mini{margin:0;border-bottom:1px solid var(--line);}
   .ap-lines .ap-mini-rows{border:none;border-radius:0;background:#fff;}
+  .ap-psheet .ap-drow-more{padding:0;}
   .ap-psheet .ap-addbar{border:none;padding:0;background:none;box-shadow:none;}
   @media(max-width:600px){
     .ap-hero-val{font-size:34px;}
@@ -4944,7 +4999,7 @@ function Styles() {
   .ap-hero-notes:empty{display:none;}
   .ap-dcard{background:var(--paper2);border:1.5px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:12px;}
   .ap-dcard .ap-empty{padding:12px 14px;margin:0;}
-  .ap-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;background:var(--emerald);}
+  .ap-dot{display:inline-block;width:10px !important;height:10px;min-width:10px;border-radius:50%;flex:none !important;background:var(--emerald);}
   .ap-dot.red{background:var(--clay);}
   .ap-dot.yellow{background:#D39A1E;}
   .ap-dot.none{background:none;border:2px solid #9AA1AC;box-sizing:border-box;}
@@ -4970,7 +5025,10 @@ function Styles() {
   .ap-dgroup .amt{font-size:13.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap;}
   .ap-dgroup .chev{font-size:12px;font-weight:600;color:var(--navy);width:34px;text-align:right;}
   .ap-dgroup[aria-expanded="true"]{background:var(--paper);}
-  .ap-dgroup+.ap-dgrid{border-bottom:1px solid var(--line);}
+  /* every list closes with one full-width line; its last row doesn't add a second one */
+  .ap-dgrid{border-bottom:1px solid var(--line);}
+  .ap-dcard>.ap-dgrid:last-child{border-bottom:none;}
+  .ap-dgrid>.ap-drow:last-child{border-bottom:none;}
   .ap-dall{display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:14px;border-bottom:1px solid var(--line);}
   .ap-dhint{grid-column:1/-1;font-size:12.5px;color:var(--ink-soft);padding:10px 14px;line-height:1.5;border-bottom:1px solid var(--line);}
   .ap-dhint .ap-linkbtn{margin-left:6px;}
@@ -4980,9 +5038,12 @@ function Styles() {
   .ap-env-items li.more{color:var(--ink-soft);font-size:12px;justify-content:center;}
   /* tablets and up: two columns so the eye doesn't travel across the whole screen */
   @media(min-width:700px){
-    .ap-dgrid{grid-template-columns:1fr 1fr;}
-    .ap-dgrid .ap-drow:nth-child(odd){border-right:1px solid var(--line);}
-    .ap-drow.open{grid-column:1/-1;border-right:none !important;}
+    /* two columns separated by a gap (no divider line); a lone last row stretches across so no half-empty row is left */
+    .ap-dgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:32px;padding:0 14px;}
+    .ap-dgrid .ap-drow-main{padding:0;}
+    .ap-dgrid .ap-drow-more{padding:0 0 12px 20px;}
+    /* the bottom line of the last row in each column: none (the list's own closing line takes over) */
+    .ap-dgrid>.ap-drow:nth-last-child(2){border-bottom:none;}
   }
   .ap-hero-val{font-size:34px;}
 
@@ -4992,7 +5053,7 @@ function Styles() {
   .ap-plantot{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-top:8px;}
   .ap-plantot b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
   .ap-planhero .ap-balance{margin:10px 0 0;}
-  .ap-dot.inc{background:var(--emerald);} .ap-dot.flex{background:#D85A30;} .ap-dot.nm{background:#BA7517;} .ap-dot.sav{background:var(--teal);}
+  .ap-dot.inc{background:var(--emerald);} .ap-dot.flex{background:#D85A30;} .ap-dot.nonmo{background:#BA7517;} .ap-dot.sav{background:var(--teal);}
   .ap-dcard .ap-planrows{border-bottom:1px solid var(--line);background:#fff;}
   .ap-dcard .ap-planrow{display:block;padding:0;border-bottom:1px solid var(--line);}
   .ap-dcard .ap-planrow:last-child{border-bottom:none;}
@@ -5028,15 +5089,46 @@ function Styles() {
   .ap-pills button.on{background:var(--navy);border-color:var(--navy);color:var(--paper2);}
   .ap-tmore{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
   .ap-tmore select{font-family:'Archivo';font-size:13.5px;border:1.5px solid var(--line);border-radius:8px;padding:8px;background:var(--paper2);min-width:0;}
-  .ap-tday{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ink-soft);background:var(--paper);padding:7px 14px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
-  .ap-trow{width:100%;display:flex;align-items:center;gap:10px;padding:8px 14px;min-height:46px;background:none;border:none;border-bottom:1px solid var(--line);cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);}
-  .ap-trow .nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
-  .ap-trow .t{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .ap-trow .sub{font-size:12px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .ap-trow .amt{font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ap-tbar2{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+  .ap-tbar2 .ap-pills{margin:0;}
+  .ap-tbar2 .ap-linkbtn{font-size:12.5px;white-space:nowrap;}
+  .ap-tday{width:100%;display:flex;align-items:center;gap:8px;padding:0 14px;min-height:38px;background:var(--paper);border:none;border-bottom:1px solid var(--line);cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);font-size:13px;}
+  .ap-tday .chev{width:10px;color:var(--ink-soft);font-size:11px;}
+  .ap-tday .dt{font-weight:600;white-space:nowrap;}
+  .ap-tday .cnt{font-size:11px;font-weight:600;color:var(--ink-soft);background:var(--paper2);border:1px solid var(--line);border-radius:10px;padding:0 6px;}
+  .ap-tday .sum{flex:1;min-width:0;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;}
+  .ap-tday .net{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
+  .ap-tday .net.in{color:var(--emerald);}
+  .ap-tday.open{background:#EEF1F5;}
+  .ap-trow{width:100%;display:grid;grid-template-columns:10px minmax(110px,1.1fr) minmax(0,2fr) auto auto;align-items:center;column-gap:12px;padding:7px 14px;min-height:38px;box-sizing:border-box;background:#fff;border:none;border-bottom:1px solid var(--line);cursor:pointer;text-align:left;font-family:'Archivo';color:var(--ink);}
+  .ap-trow:hover{background:#F7F9FB;}
+  .ap-trow.grp .cat{font-weight:600;}
+  .ap-trow.grp.open{background:#F7F9FB;}
+  .ap-trow.sub{padding-left:38px;min-height:34px;background:#FBFCFD;}
+  .ap-trow.sub .cat{font-size:12.5px;font-weight:400;color:var(--ink-soft);font-family:'JetBrains Mono';}
+  .ap-trow.sub .ap-tdot{visibility:hidden;}
+  .ap-grpchev{font-size:12px;font-weight:600;color:var(--navy);}
+  .ap-tdot{width:8px;height:8px;border-radius:50%;background:var(--clay);}
+  .ap-tdot.income{background:var(--emerald);} .ap-tdot.savings{background:var(--teal);}
+  .ap-trow .cat{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-trow .det{min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+  .ap-trow .note{font-size:13px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-trow .raw{font-family:'JetBrains Mono';font-size:10.5px;color:#9AA1AC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap-trow .tags{display:flex;gap:4px;align-items:center;justify-content:flex-end;}
+  .ap-trow .tags .ap-srcpdf,.ap-trow .tags .ap-countsin{margin:0;}
+  .ap-trow .amt{font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;min-width:84px;}
   .ap-trow .amt.income{color:var(--emerald);} .ap-trow .amt.savings{color:var(--teal);}
-  .ap-trow:hover{background:#fff;}
-  .ap-tlist>.ap-trow:last-child,.ap-tlist>.ap-dgroup:last-child{border-bottom:none;}
+  .ap-tlist>.ap-trow:last-child,.ap-tlist>.ap-dgroup:last-child,.ap-tlist>.ap-tday:last-child{border-bottom:none;}
+  @media(max-width:600px){
+    .ap-trow{grid-template-columns:8px minmax(0,1fr) auto;grid-template-areas:"dot cat amt" ". det tags";row-gap:1px;column-gap:10px;padding:7px 14px;}
+    .ap-tdot{grid-area:dot;} .ap-trow .cat{grid-area:cat;} .ap-trow .det{grid-area:det;} .ap-trow .tags{grid-area:tags;} .ap-trow .amt{grid-area:amt;min-width:0;}
+    .ap-trow .det:empty{display:none;}
+    .ap-trow .raw{display:none;}
+    .ap-trow.sub{padding-left:32px;}
+    .ap-trow.sub .cat{font-size:12px;}
+    .ap-tday .sum{font-size:12px;}
+    .ap-tbar2{flex-wrap:wrap;}
+  }
   .ap-tfoot{text-align:center;font-size:12.5px;color:var(--ink-soft);margin:-2px 0 14px;}
   .ap-tedit{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .ap-tedit label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink-soft);min-width:0;}
